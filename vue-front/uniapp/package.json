@@ -1,0 +1,26 @@
+{
+  "name": "uni-app-project",
+  "version": "1.0.0",
+  "description": "uni-app project",
+  "main": "main.js",
+  "scripts": {
+    "dev:mp-weixin": "uni dev mp-weixin",
+    "build:mp-weixin": "uni build mp-weixin",
+    "watch:static": "powershell -ExecutionPolicy Bypass -File watch-static.ps1",
+    "copy:static": "powershell -ExecutionPolicy Bypass -File watch-static.ps1 -Interval 1"
+  },
+  "keywords": [
+    "uni-app",
+    "vue",
+    "wechat-miniprogram"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@dcloudio/uni-app-plus": "^2.0.2-5000720260410001",
+    "@dcloudio/uni-cli-utils": "^3.0.0-alpha-3090920231127001"
+  },
+  "dependencies": {
+    "sharp": "^0.34.5"
+  }
+}

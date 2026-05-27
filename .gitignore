@@ -1,0 +1,47 @@
+# === Java / Maven ===
+target/
+*.class
+*.jar
+*.war
+*.ear
+*.log
+hs_err_pid*
+.mvn/
+mvnw
+mvnw.cmd
+
+# === IDE ===
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+.settings/
+.project
+.classpath
+.factorypath
+*.swp
+*.swo
+*~
+
+# === Claude Code ===
+.claude/
+
+# === OS ===
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# === Spring Boot (secrets) ===
+src/main/resources/application.properties
+src/main/resources/application-*.properties
+src/main/resources/application-*.yml
+
+# === UniApp / Node ===
+vue-front/uniapp/node_modules/
+vue-front/uniapp/unpackage/
+vue-front/uniapp/.hbuilderx/
+vue-front/uniapp/dist/
+
+# === UniApp project configs (IDE generated) ===
+vue-front/uniapp/project.private.config.json

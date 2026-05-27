@@ -1,0 +1,86 @@
+{
+	"pages": [ 
+				{
+					"path": "pages/login/login",
+					"style": {
+						"navigationBarTitleText": ""
+					}
+				},
+				
+		{
+			"path": "pages/index/index",
+			"style": {
+				"navigationBarTitleText": "首页"
+			}
+		},
+		{
+			"path": "pages/order/order",
+			"style": {
+				"navigationBarTitleText": "点餐"
+			}
+		},
+		{
+			"path": "pages/bill/bill",
+			"style": {
+				"navigationBarTitleText": "订单"
+			}
+		},
+		{
+			"path": "pages/user/user",
+			"style": {
+				"navigationBarTitleText": "个人"
+			}
+		},
+		{
+			"path": "pages/product-detail/product-detail",
+			"style": {
+				"navigationBarTitleText": "商品详情"
+			}
+		},
+		{
+			"path": "pages/order-detail/order-detail",
+			"style": {
+				"navigationBarTitleText": "订单详情"
+			}
+		}
+	],
+	"globalStyle": {
+		"navigationBarTextStyle": "black",
+		"navigationBarTitleText": "uni-app",
+		"navigationBarBackgroundColor": "#F8F8F8",
+		"backgroundColor": "#F8F8F8"
+	},
+	"tabBar": {
+		"color": "#999999",
+		"selectedColor": "#FF6B6B",
+		"backgroundColor": "#ffffff",
+		"borderStyle": "black",
+		"list": [
+			{
+				"pagePath": "pages/index/index",
+				"text": "首页",
+				"iconPath": "/static/tabbar/index.png",
+				"selectedIconPath": "/static/tabbar/index-s.png"
+			},
+			{
+				"pagePath": "pages/order/order",
+				"text": "点餐",
+				"iconPath": "/static/tabbar/sweet_potato.png",
+				"selectedIconPath": "/static/tabbar/sweet_potato-s.png"
+			},
+			{
+				"pagePath": "pages/bill/bill",
+				"text": "订单",
+				"iconPath": "/static/tabbar/bill.png",
+				"selectedIconPath": "/static/tabbar/bill-s.png"
+			},
+			{
+				"pagePath": "pages/user/user",
+				"text": "个人",
+				"iconPath": "/static/tabbar/user.png",
+				"selectedIconPath": "/static/tabbar/user-s.png"
+			}
+		]
+	},
+	"uniIdRouter": {}
+}
