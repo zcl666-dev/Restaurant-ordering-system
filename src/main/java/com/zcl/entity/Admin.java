@@ -11,45 +11,35 @@ import jakarta.persistence.Table;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-/**
- * 用户实体类
- */
 @Entity
-@Table(name = "user")
+@Table(name = "admin")
 @Data
 @NoArgsConstructor
-public class User {
+public class Admin {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "openid", unique = true, nullable = false, length = 100)
-    private String openId;
+    @Column(name = "username", unique = true, nullable = false, length = 50)
+    private String username;
 
-    @Column(name = "nickname", length = 100)
-    private String nickName;
+    @Column(name = "password", nullable = false, length = 100)
+    private String password;
 
-    @Column(name = "avatar_url", length = 500)
-    private String avatarUrl;
+    @Column(name = "real_name", length = 50)
+    private String realName;
 
-    @Column(name = "points_balance", nullable = false)
-    private Integer pointsBalance = 0;
-
-    @Column(name = "balance", nullable = false, precision = 10, scale = 2)
-    private BigDecimal balance = BigDecimal.ZERO;
-
-    @Column(name = "total_spent_amount", nullable = false, precision = 10, scale = 2)
-    private BigDecimal totalSpentAmount = BigDecimal.ZERO;
-
-    @Column(name = "total_order_count", nullable = false)
-    private Integer totalOrderCount = 0;
+    @Column(name = "role", nullable = false, length = 20)
+    private String role = "admin";
 
     @Column(name = "status", nullable = false)
-    private Integer status = 1; // 0禁用 1正常
+    private Integer status = 1;
+
+    @Column(name = "last_login_time")
+    private LocalDateTime lastLoginTime;
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;

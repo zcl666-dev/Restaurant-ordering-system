@@ -125,4 +125,60 @@ public class JwtUtil {
             return false;
         }
     }
+
+    // ==================== Admin Token Methods ====================
+
+    /**
+     * 生成管理员 JWT Token
+     */
+    public String generateAdminToken(Long adminId, String username, String role) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("adminId", adminId);
+        claims.put("username", username);
+        claims.put("role", role);
+        claims.put("type", "admin");
+
+        Date now = new Date();
+        Date expiryDate = new Date(now.getTime() + expiration);
+
+        return Jwts.builder()
+                .claims(claims)
+                .subject(username)
+                .issuedAt(now)
+                .expiration(expiryDate)
+                .signWith(getSecretKey())
+                .compact();
+    }
+
+    /**
+     * 从 Token 中获取 adminId
+     */
+    public Long getAdminIdFromToken(String token) {
+        Claims claims = parseToken(token);
+        return claims.get("adminId", Long.class);
+    }
+
+    /**
+     * 从 Token 中获取 username（管理员）
+     */
+    public String getUsernameFromToken(String token) {
+        Claims claims = parseToken(token);
+        return claims.get("username", String.class);
+    }
+
+    /**
+     * 从 Token 中获取 role
+     */
+    public String getRoleFromToken(String token) {
+        Claims claims = parseToken(token);
+        return claims.get("role", String.class);
+    }
+
+    /**
+     * 从 Token 中获取 type（admin/user）
+     */
+    public String getTokenTypeFromToken(String token) {
+        Claims claims = parseToken(token);
+        return claims.get("type", String.class);
+    }
 }

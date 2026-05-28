@@ -45,3 +45,7 @@ vue-front/uniapp/dist/
 
 # === UniApp project configs (IDE generated) ===
 vue-front/uniapp/project.private.config.json
+
+# === Admin Frontend ===
+admin/node_modules/
+admin/dist/

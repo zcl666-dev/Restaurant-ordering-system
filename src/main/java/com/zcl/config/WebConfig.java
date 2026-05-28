@@ -5,23 +5,26 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
-/**
- * Web MVC 配置类
- * 用于注册拦截器和配置其他 Web 相关设置
- */
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
 
     @Autowired
     private JwtAuthenticationInterceptor jwtAuthenticationInterceptor;
 
-    /**
-     * 注册拦截器
-     */
+    @Autowired
+    private AdminAuthInterceptor adminAuthInterceptor;
+
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
+        // 用户端拦截器：拦截 /api/** 但排除登录和管理后台
         registry.addInterceptor(jwtAuthenticationInterceptor)
-                .addPathPatterns("/api/**")  // 拦截所有 /api/** 路径的请求
-                .excludePathPatterns("/api/wx/login");  // 排除登录接口（不需要 Token）
+                .addPathPatterns("/api/**")
+                .excludePathPatterns("/api/wx/login")
+                .excludePathPatterns("/api/admin/**");
+
+        // 管理后台拦截器：拦截 /api/admin/** 但排除管理后台登录
+        registry.addInterceptor(adminAuthInterceptor)
+                .addPathPatterns("/api/admin/**")
+                .excludePathPatterns("/api/admin/login");
     }
 }
