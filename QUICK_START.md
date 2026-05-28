@@ -62,11 +62,11 @@ spring.jpa.hibernate.ddl-auto=update
 spring.jpa.show-sql=true
 
 # 微信小程序配置（替换为你的真实 appid 和 secret）
-wx.mini.appid=wx60b0706df54d5f2e
-wx.mini.secret=4dbfdde78a84540e8ee3b780c5fd2ad0
+wx.mini.appid=${WX_MINI_APPID:your_appid}
+wx.mini.secret=${WX_MINI_SECRET:your_secret}
 
 # JWT 配置
-jwt.secret=mySecretKeyForJwtTokenGenerationAndValidation123456789
+jwt.secret=${JWT_SECRET:change_this_to_a_random_string_in_production}
 jwt.expiration=604800000
 ```
 
