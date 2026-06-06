@@ -42,6 +42,12 @@
 			"style": {
 				"navigationBarTitleText": "订单详情"
 			}
+		},
+		{
+			"path": "pages/points/points",
+			"style": {
+				"navigationBarTitleText": "积分详情"
+			}
 		}
 	],
 	"globalStyle": {

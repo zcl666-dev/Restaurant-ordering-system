@@ -19,3 +19,7 @@ export const payOrder = (id) => {
 export const getOrderList = () => {
   return get('/api/order/list')
 }
+
+export const completeOrder = (id) => {
+  return put(`/api/order/${id}/complete`)
+}

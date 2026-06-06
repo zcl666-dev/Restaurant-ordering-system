@@ -1,17 +1,23 @@
 <template>
   <view class="product-detail-page">
     <scroll-view class="detail-scroll" scroll-y v-if="!isLoading && !loadError && product">
-      <image
-        class="product-image"
-        :src="product.productImage"
-        mode="aspectFill"
-        @error="onImageError"
-      />
+      <view class="image-wrapper">
+        <image
+          class="product-image"
+          :src="product.productImage"
+          mode="aspectFill"
+          @error="onImageError"
+        />
+        <view class="image-gradient"></view>
+      </view>
 
       <view class="product-base-info">
         <text class="product-name">{{ product.productName }}</text>
         <view class="price-sales-row">
-          <text class="product-price">¥{{ product.price.toFixed(2) }}</text>
+          <view class="price-wrapper">
+            <text class="price-symbol">¥</text>
+            <text class="product-price">{{ product.price.toFixed(2) }}</text>
+          </view>
           <text class="product-sales">已售 {{ product.salesCount }}</text>
         </view>
       </view>
@@ -19,7 +25,10 @@
       <view class="section-divider"></view>
 
       <view class="product-desc-section">
-        <text class="section-label">商品描述</text>
+        <view class="section-label-row">
+          <view class="section-label-bar"></view>
+          <text class="section-label">商品描述</text>
+        </view>
         <text class="product-desc">{{ product.description }}</text>
       </view>
 
@@ -50,16 +59,21 @@
     </scroll-view>
 
     <view class="loading-container" v-if="isLoading">
+      <view class="loading-spinner"></view>
       <text class="loading-text">加载中...</text>
     </view>
 
     <view class="error-container" v-else-if="loadError" @click="fetchProductDetail">
+      <text class="error-icon">😵</text>
       <text class="error-text">{{ loadError }}</text>
       <text class="retry-text">点击重试</text>
     </view>
 
     <view class="bottom-bar">
-      <button class="add-cart-btn" @click="addToCartHandler">加入购物车</button>
+      <button class="add-cart-btn" @click="addToCartHandler">
+        <text class="btn-icon">🛒</text>
+        <text class="btn-text">加入购物车</text>
+      </button>
     </view>
   </view>
 </template>
@@ -175,35 +189,63 @@ onLoad((options) => {
   overflow: hidden;
 }
 
+.image-wrapper {
+  position: relative;
+  width: 100%;
+  height: 520rpx;
+}
+
 .product-image {
   width: 100%;
-  height: 500rpx;
-  background-color: #eee;
+  height: 100%;
+  background-color: #f0f0f0;
+}
+
+.image-gradient {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 80rpx;
+  background: linear-gradient(180deg, transparent, #ffffff);
 }
 
 .product-base-info {
-  padding: 30rpx;
+  padding: 24rpx 30rpx 30rpx;
   background-color: #fff;
 }
 
 .product-name {
-  font-size: 36rpx;
-  font-weight: bold;
+  font-size: 38rpx;
+  font-weight: 700;
   color: #333;
   line-height: 1.4;
+  display: block;
 }
 
 .price-sales-row {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   justify-content: space-between;
   margin-top: 20rpx;
 }
 
-.product-price {
-  font-size: 40rpx;
+.price-wrapper {
+  display: flex;
+  align-items: baseline;
+  gap: 4rpx;
+}
+
+.price-symbol {
+  font-size: 28rpx;
   color: #FF6B6B;
-  font-weight: bold;
+  font-weight: 600;
+}
+
+.product-price {
+  font-size: 44rpx;
+  color: #FF6B6B;
+  font-weight: 700;
 }
 
 .product-sales {
@@ -217,26 +259,39 @@ onLoad((options) => {
 }
 
 .product-desc-section {
-  padding: 30rpx;
+  padding: 28rpx 30rpx;
   background-color: #fff;
+}
+
+.section-label-row {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin-bottom: 16rpx;
+}
+
+.section-label-bar {
+  width: 6rpx;
+  height: 28rpx;
+  background: linear-gradient(180deg, #FF6B6B, #FF8E53);
+  border-radius: 3rpx;
 }
 
 .section-label {
   font-size: 28rpx;
-  color: #999;
-  display: block;
+  color: #333;
+  font-weight: 600;
 }
 
 .product-desc {
-  font-size: 30rpx;
-  color: #333;
-  margin-top: 16rpx;
-  line-height: 1.6;
+  font-size: 28rpx;
+  color: #666;
+  line-height: 1.8;
   display: block;
 }
 
 .product-specs-section {
-  padding: 30rpx;
+  padding: 28rpx 30rpx;
   background-color: #fff;
 }
 
@@ -251,7 +306,7 @@ onLoad((options) => {
 .spec-group-name {
   font-size: 28rpx;
   color: #333;
-  font-weight: bold;
+  font-weight: 600;
   display: block;
   margin-bottom: 16rpx;
 }
@@ -263,30 +318,35 @@ onLoad((options) => {
 }
 
 .spec-option {
-  padding: 14rpx 32rpx;
-  border-radius: 8rpx;
-  border: 2rpx solid #ddd;
+  padding: 14rpx 36rpx;
+  border-radius: 12rpx;
+  border: 2rpx solid #e8e8e8;
   background-color: #fff;
-  transition: all 0.2s;
+  transition: all 0.2s ease;
+
+  &:active {
+    transform: scale(0.95);
+  }
 }
 
 .spec-option.active {
   border-color: #FF6B6B;
   background-color: #FFF0F0;
+  box-shadow: 0 2rpx 12rpx rgba(255, 107, 107, 0.15);
 }
 
 .spec-option-text {
   font-size: 26rpx;
-  color: #333;
+  color: #666;
 }
 
 .spec-option.active .spec-option-text {
   color: #FF6B6B;
-  font-weight: bold;
+  font-weight: 600;
 }
 
 .bottom-placeholder {
-  height: 120rpx;
+  height: 140rpx;
 }
 
 .loading-container,
@@ -296,6 +356,21 @@ onLoad((options) => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 16rpx;
+}
+
+.loading-spinner {
+  width: 60rpx;
+  height: 60rpx;
+  border: 4rpx solid #f0f0f0;
+  border-top: 4rpx solid #FF6B6B;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 .loading-text {
@@ -303,10 +378,13 @@ onLoad((options) => {
   color: #999;
 }
 
+.error-icon {
+  font-size: 64rpx;
+}
+
 .error-text {
   font-size: 28rpx;
   color: #FF6B6B;
-  margin-bottom: 20rpx;
 }
 
 .retry-text {
@@ -320,27 +398,46 @@ onLoad((options) => {
   bottom: 0;
   left: 0;
   right: 0;
-  padding: 20rpx 30rpx;
-  padding-bottom: calc(20rpx + env(safe-area-inset-bottom));
+  padding: 16rpx 30rpx;
+  padding-bottom: calc(16rpx + env(safe-area-inset-bottom));
   background-color: #fff;
-  box-shadow: 0 -2rpx 10rpx rgba(0, 0, 0, 0.05);
+  box-shadow: 0 -4rpx 16rpx rgba(0, 0, 0, 0.06);
   z-index: 100;
 }
 
 .add-cart-btn {
   width: 100%;
-  height: 88rpx;
-  line-height: 88rpx;
-  background-color: #FF6B6B;
+  height: 92rpx;
+  line-height: 92rpx;
+  background: linear-gradient(135deg, #FF6B6B 0%, #FF8E53 100%);
   color: #fff;
   font-size: 32rpx;
   font-weight: bold;
-  border-radius: 44rpx;
+  border-radius: 46rpx;
   border: none;
   text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12rpx;
+  box-shadow: 0 8rpx 24rpx rgba(255, 107, 107, 0.3);
+  transition: all 0.2s ease;
 }
 
 .add-cart-btn::after {
   border: none;
+}
+
+.add-cart-btn:active {
+  transform: scale(0.98);
+  box-shadow: 0 4rpx 16rpx rgba(255, 107, 107, 0.2);
+}
+
+.btn-icon {
+  font-size: 36rpx;
+}
+
+.btn-text {
+  font-size: 32rpx;
 }
 </style>

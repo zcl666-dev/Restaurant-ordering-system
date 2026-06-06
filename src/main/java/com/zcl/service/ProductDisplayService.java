@@ -75,7 +75,9 @@ public class ProductDisplayService {
         vo.setId(product.getId());
         vo.setProductName(product.getProductName());
         vo.setProductImage(product.getProductImage());
+        vo.setDesc(product.getDescription());
         vo.setPrice(product.getPrice());
+        vo.setSalesCount(product.getSalesCount() != null ? product.getSalesCount() : 0);
         return vo;
     }
 }

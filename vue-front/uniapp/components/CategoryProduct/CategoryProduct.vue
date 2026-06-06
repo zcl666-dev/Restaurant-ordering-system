@@ -1,24 +1,22 @@
 <template>
   <view class="category-product-container">
-    <scroll-view
-      class="category-scroll"
-      scroll-y
-      :scroll-into-view="scrollIntoId"
-      scroll-with-animation
-    >
+    <!-- 左侧分类栏 -->
+    <scroll-view class="category-scroll" scroll-y :scroll-into-view="scrollIntoId" scroll-with-animation>
       <view
         v-for="(category, index) in categories"
         :key="category.id"
-        :id="'category-' + category.id"
+        :id="'cat-' + category.id"
         class="category-item"
         :class="{ active: currentCategory === index }"
         @click="handleCategoryClick(index)"
       >
+        <view v-if="currentCategory === index" class="active-bar"></view>
+        <text class="category-icon" v-if="category.icon">{{ category.icon }}</text>
         <text class="category-name">{{ category.name }}</text>
-        <view v-if="currentCategory === index" class="active-indicator"></view>
       </view>
     </scroll-view>
 
+    <!-- 右侧商品列表 -->
     <scroll-view
       class="product-scroll"
       scroll-y
@@ -31,29 +29,38 @@
         <view
           v-for="category in categories"
           :key="category.id"
-          :id="'product-' + category.id"
+          :id="'prod-' + category.id"
           class="category-section"
         >
+          <!-- 分类标题 -->
           <view class="section-header">
             <text class="section-title">{{ category.name }}</text>
           </view>
-          <view class="product-list">
-            <view
-              v-for="product in category.products"
-              :key="product.id"
-              class="product-item"
-              @click="handleProductClick(product)"
-            >
-              <image class="product-image" :src="product.image" mode="aspectFill" @load="onProductImageLoad" />
-              <view class="product-info">
-                <text class="product-name">{{ product.name }}</text>
-                <text class="product-desc">{{ product.desc }}</text>
-                <view class="product-price-row">
-                  <text class="product-price">¥{{ product.price.toFixed(2) }}</text>
-                  <text v-if="product.originalPrice" class="product-original-price">¥{{ product.originalPrice.toFixed(2) }}</text>
+
+          <!-- 商品卡片列表 -->
+          <view
+            v-for="product in category.products"
+            :key="product.id"
+            class="product-card"
+            @click="handleProductClick(product)"
+          >
+            <image class="product-image" :src="product.image" mode="aspectFill" @load="onProductImageLoad" />
+            <view class="product-info">
+              <text class="product-name">{{ product.name }}</text>
+              <text class="product-desc" v-if="product.desc">{{ product.desc }}</text>
+              <text class="product-sales" v-if="product.salesCount > 0">月售{{ product.salesCount }}</text>
+              <view class="product-tags" v-if="product.tags && product.tags.length > 0">
+                <text v-for="tag in product.tags" :key="tag" class="product-tag">{{ tag }}</text>
+              </view>
+              <view class="product-bottom">
+                <view class="price-row">
+                  <text class="price-symbol">¥</text>
+                  <text class="product-price">{{ product.price.toFixed(0) }}</text>
+                  <text class="price-unit">/份</text>
+                  <text v-if="product.originalPrice" class="product-original-price">¥{{ product.originalPrice.toFixed(0) }}</text>
                 </view>
-                <view class="product-tags">
-                  <text v-for="tag in product.tags" :key="tag" class="product-tag">{{ tag }}</text>
+                <view class="add-btn" @click.stop="handleAddToCart(product)">
+                  <text class="add-icon">+</text>
                 </view>
               </view>
             </view>
@@ -81,7 +88,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['category-change', 'product-click', 'scroll'])
+const emit = defineEmits(['category-change', 'product-click', 'scroll', 'add-to-cart'])
 
 const currentCategory = ref(props.defaultIndex)
 const scrollIntoId = ref('')
@@ -103,16 +110,13 @@ const handleCategoryClick = (index) => {
   scrollToId.value = ''
 
   nextTick(() => {
-    scrollToId.value = 'product-' + category.id
+    scrollToId.value = 'prod-' + category.id
     setTimeout(() => {
       isClickScrolling = false
     }, 600)
   })
 
-  emit('category-change', {
-    index,
-    category: props.categories[index]
-  })
+  emit('category-change', { index, category: props.categories[index] })
 }
 
 const handleScroll = (e) => {
@@ -143,7 +147,7 @@ const syncCategoryByScrollTop = (scrollTop) => {
     currentCategory.value = targetIndex
     scrollIntoId.value = ''
     nextTick(() => {
-      scrollIntoId.value = 'category-' + props.categories[targetIndex].id
+      scrollIntoId.value = 'cat-' + props.categories[targetIndex].id
     })
   }
 }
@@ -152,7 +156,7 @@ const calcCategoryPositions = () => {
   const query = uni.createSelectorQuery().in(instance.proxy)
 
   props.categories.forEach((category) => {
-    query.select('#product-' + category.id).boundingClientRect()
+    query.select('#prod-' + category.id).boundingClientRect()
   })
 
   query.exec((res) => {
@@ -185,6 +189,10 @@ const handleProductClick = (product) => {
   emit('product-click', product)
 }
 
+const handleAddToCart = (product) => {
+  emit('add-to-cart', product)
+}
+
 let imageLoadTimer = null
 const onProductImageLoad = () => {
   if (imageLoadTimer) clearTimeout(imageLoadTimer)
@@ -208,12 +216,8 @@ watch(() => props.defaultIndex, (newVal) => {
 
 onMounted(() => {
   currentCategory.value = props.defaultIndex
-  setTimeout(() => {
-    calcCategoryPositions()
-  }, 300)
-  setTimeout(() => {
-    calcCategoryPositions()
-  }, 800)
+  setTimeout(() => { calcCategoryPositions() }, 300)
+  setTimeout(() => { calcCategoryPositions() }, 800)
 })
 
 onUnmounted(() => {
@@ -247,190 +251,215 @@ defineExpose({
   background-color: #f5f5f5;
 }
 
+/* ========== 左侧分类栏 ========== */
 .category-scroll {
-  width: 200rpx;
+  width: 180rpx;
   height: 100%;
-  background-color: #f8f8f8;
-  border-right: 1rpx solid #e0e0e0;
+  background-color: #f5f5f5;
 }
 
 .category-item {
   position: relative;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  padding: 30rpx 20rpx;
-  font-size: 28rpx;
-  color: #666666;
-  background-color: #f8f8f8;
+  justify-content: center;
+  padding: 28rpx 12rpx;
+  font-size: 24rpx;
+  color: #666;
   transition: all 0.3s ease;
 
   &.active {
-    background-color: #ffffff;
-    color: #FF6B6B;
+    background-color: #fff;
+    color: #333;
     font-weight: 600;
   }
-
-  &:active {
-    background-color: #f0f0f0;
-  }
 }
 
-.category-name {
-  flex: 1;
-  text-align: center;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.active-indicator {
+.active-bar {
   position: absolute;
   left: 0;
   top: 50%;
   transform: translateY(-50%);
   width: 6rpx;
   height: 40rpx;
-  background-color: #FF6B6B;
+  background: linear-gradient(180deg, #FF6B6B, #FF8E53);
   border-radius: 0 3rpx 3rpx 0;
 }
 
+.category-icon {
+  font-size: 40rpx;
+  margin-bottom: 8rpx;
+}
+
+.category-name {
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+/* ========== 右侧商品列表 ========== */
 .product-scroll {
   flex: 1;
   height: 100%;
-  background-color: #ffffff;
+  background-color: #fff;
 }
 
 .product-content {
-  padding: 20rpx;
+  padding: 0 20rpx 120rpx;
 }
 
 .category-section {
-  margin-bottom: 30rpx;
+  margin-bottom: 16rpx;
 }
 
 .section-header {
-  padding: 15rpx 0;
-  margin-bottom: 15rpx;
-  border-bottom: 2rpx solid #f0f0f0;
+  padding: 24rpx 8rpx 16rpx;
 }
 
 .section-title {
-  font-size: 32rpx;
+  font-size: 30rpx;
   font-weight: 600;
-  color: #333333;
+  color: #333;
 }
 
-.product-list {
+/* ========== 商品卡片 ========== */
+.product-card {
   display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-}
-
-.product-item {
-  width: calc(50% - 10rpx);
-  margin-bottom: 20rpx;
-  background-color: #ffffff;
-  border-radius: 12rpx;
-  overflow: hidden;
-  box-shadow: 0 2rpx 10rpx rgba(0, 0, 0, 0.05);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  background: #fff;
+  border-radius: 16rpx;
+  padding: 20rpx;
+  margin-bottom: 16rpx;
+  box-shadow: 0 2rpx 16rpx rgba(0, 0, 0, 0.04);
+  border: 1rpx solid #f5f5f5;
 
   &:active {
-    transform: scale(0.98);
-    box-shadow: 0 4rpx 20rpx rgba(0, 0, 0, 0.1);
+    background-color: #fafafa;
   }
 }
 
 .product-image {
-  width: 100%;
-  height: 200rpx;
+  width: 180rpx;
+  height: 180rpx;
+  border-radius: 14rpx;
   background-color: #f5f5f5;
+  flex-shrink: 0;
 }
 
 .product-info {
-  padding: 15rpx;
+  flex: 1;
+  margin-left: 20rpx;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-width: 0;
 }
 
 .product-name {
-  display: block;
-  font-size: 26rpx;
-  font-weight: 500;
-  color: #333333;
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #333;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  margin-bottom: 8rpx;
 }
 
 .product-desc {
-  display: block;
   font-size: 22rpx;
-  color: #999999;
+  color: #999;
+  margin-top: 6rpx;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
-  margin-bottom: 10rpx;
+  line-height: 1.4;
 }
 
-.product-price-row {
-  display: flex;
-  align-items: baseline;
-  gap: 10rpx;
-  margin-bottom: 10rpx;
-}
-
-.product-price {
-  font-size: 32rpx;
-  font-weight: 600;
-  color: #FF6B6B;
-}
-
-.product-original-price {
+.product-sales {
   font-size: 22rpx;
-  color: #cccccc;
-  text-decoration: line-through;
+  color: #999;
+  margin-top: 4rpx;
 }
 
 .product-tags {
   display: flex;
   flex-wrap: wrap;
   gap: 8rpx;
+  margin-top: 8rpx;
 }
 
 .product-tag {
   font-size: 20rpx;
   color: #FF6B6B;
   background-color: #fff5f5;
-  padding: 4rpx 10rpx;
-  border-radius: 4rpx;
+  padding: 4rpx 12rpx;
+  border-radius: 6rpx;
+  border: 1rpx solid rgba(255, 107, 107, 0.15);
 }
 
-@media screen and (min-width: 768px) {
-  .category-scroll {
-    width: 180rpx;
-  }
+.product-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10rpx;
+}
 
-  .product-item {
-    width: calc(33.33% - 15rpx);
-  }
+.price-row {
+  display: flex;
+  align-items: baseline;
+  gap: 2rpx;
+}
 
-  .product-image {
-    height: 240rpx;
+.price-symbol {
+  font-size: 22rpx;
+  font-weight: 600;
+  color: #FF6B6B;
+}
+
+.product-price {
+  font-size: 36rpx;
+  font-weight: 700;
+  color: #FF6B6B;
+  line-height: 1;
+}
+
+.price-unit {
+  font-size: 22rpx;
+  color: #999;
+  margin-left: 4rpx;
+}
+
+.product-original-price {
+  font-size: 22rpx;
+  color: #ccc;
+  text-decoration: line-through;
+  margin-left: 10rpx;
+}
+
+.add-btn {
+  width: 52rpx;
+  height: 52rpx;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #FF6B6B, #FF8E53);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 4rpx 12rpx rgba(255, 107, 107, 0.3);
+  transition: transform 0.2s ease;
+
+  &:active {
+    transform: scale(0.9);
   }
 }
 
-@media screen and (max-width: 320px) {
-  .category-scroll {
-    width: 160rpx;
-  }
-
-  .category-item {
-    padding: 25rpx 15rpx;
-    font-size: 24rpx;
-  }
-
-  .product-image {
-    height: 160rpx;
-  }
+.add-icon {
+  font-size: 36rpx;
+  color: #fff;
+  font-weight: 300;
+  line-height: 1;
 }
 </style>

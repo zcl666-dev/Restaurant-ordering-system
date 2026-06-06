@@ -9,14 +9,17 @@
           v-model="searchText"
           @confirm="handleSearch"
         />
+        <view class="search-line"></view>
       </view>
     </view>
 
     <view class="loading-container" v-if="isLoading">
+      <view class="loading-spinner"></view>
       <text class="loading-text">加载中...</text>
     </view>
 
     <view class="error-container" v-else-if="loadError" @click="fetchProductDisplay">
+      <text class="error-icon">😵</text>
       <text class="error-text">{{ loadError }}</text>
       <text class="retry-text">点击重试</text>
     </view>
@@ -29,9 +32,11 @@
       @category-change="handleCategoryChange"
       @product-click="handleProductClick"
       @scroll="handleScroll"
+      @add-to-cart="handleQuickAdd"
     />
 
     <view class="empty-container" v-else>
+      <text class="empty-icon">🍽</text>
       <text class="empty-text">暂无商品数据</text>
     </view>
 
@@ -48,12 +53,14 @@
       </view>
     </view>
 
-    <view class="cart-popup-overlay" v-show="showCartPopup">
+    <view class="cart-popup-overlay" :class="{ show: showCartPopup }">
       <view class="cart-popup-mask" @tap="showCartPopup = false"></view>
       <view class="cart-popup">
         <view class="cart-popup-header">
           <text class="cart-popup-title">购物车</text>
-          <text class="cart-popup-close" @tap="showCartPopup = false">✕</text>
+          <view class="cart-popup-close" @tap="showCartPopup = false">
+            <text class="close-icon">✕</text>
+          </view>
         </view>
         <scroll-view class="cart-popup-body" scroll-y>
           <view
@@ -77,19 +84,28 @@
               <view class="cart-item-bottom">
                 <text class="cart-item-price">¥{{ item.unitPrice.toFixed(2) }}</text>
                 <view class="cart-item-stepper">
-                  <text class="stepper-btn" @tap="handleDecrement(item)">−</text>
+                  <text class="stepper-btn minus" @tap="handleDecrement(item)">−</text>
                   <text class="stepper-value">{{ item.quantity }}</text>
-                  <text class="stepper-btn" @tap="handleIncrement(item)">+</text>
+                  <text class="stepper-btn plus" @tap="handleIncrement(item)">+</text>
                 </view>
               </view>
             </view>
           </view>
           <view class="cart-empty-tip" v-if="cartData.items.length === 0">
+            <text class="cart-empty-icon">🛒</text>
             <text>购物车是空的</text>
           </view>
         </scroll-view>
       </view>
     </view>
+
+    <!-- 订阅授权弹窗 -->
+    <SubscribePopup
+      ref="subscribePopupRef"
+      v-model:visible="showSubscribePopup"
+      @confirm="onSubscribeConfirm"
+      @cancel="onSubscribeCancel"
+    />
   </view>
 </template>
 
@@ -97,10 +113,10 @@
 import { ref, onMounted } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import CategoryProduct from '@/components/CategoryProduct/CategoryProduct.vue'
+import SubscribePopup from '@/components/SubscribePopup/SubscribePopup.vue'
 import { getProductDisplay } from '@/api/product.js'
 import { getCurrentCart, addToCart, updateCartItem } from '@/api/cart.js'
 import { createOrder } from '@/api/order.js'
-import { requestOrderSubscribe } from '@/utils/subscribe.js'
 
 const searchText = ref('')
 const defaultIndex = ref(0)
@@ -117,6 +133,9 @@ const cartData = ref({
 })
 
 const showCartPopup = ref(false)
+const showSubscribePopup = ref(false)
+const subscribePopupRef = ref(null)
+let pendingOrderId = null
 
 const fetchProductDisplay = async () => {
   isLoading.value = true
@@ -136,7 +155,8 @@ const fetchProductDisplay = async () => {
           price: p.price || 0,
           originalPrice: p.originalPrice || null,
           image: p.productImage || '',
-          tags: p.tags || []
+          tags: p.tags || [],
+          salesCount: p.salesCount || 0
         }))
       }))
     } else {
@@ -247,23 +267,74 @@ const handleProductClick = (product) => {
   })
 }
 
+const handleQuickAdd = async (product) => {
+  try {
+    const res = await addToCart({
+      productId: product.id,
+      optionSnapshot: null
+    })
+    cartData.value.totalQuantity = res.totalQuantity || 0
+    cartData.value.totalAmount = res.totalAmount || 0
+    if (res.cartId != null) {
+      cartData.value.cartId = res.cartId
+    }
+    // 如果有规格选项，跳转到商品详情页
+    uni.showToast({ title: '已加入购物车', icon: 'success' })
+  } catch (err) {
+    uni.showToast({ title: err.message || '加购失败', icon: 'none' })
+  }
+}
+
 const handleScroll = (data) => {
 }
 
 const handleCheckout = async () => {
   try {
     const res = await createOrder()
+    pendingOrderId = res.orderId
 
-    requestOrderSubscribe()
-
-    uni.navigateTo({
-      url: `/pages/order-detail/order-detail?id=${res.orderId}`
-    })
+    // 检查用户是否已经勾选了"总是保持以上选择"
+    if (subscribePopupRef.value && subscribePopupRef.value.hasKeepChoice()) {
+      // 已保存选择，静默调用微信订阅API（不弹自定义弹窗，但仍会弹微信原生授权）
+      await subscribePopupRef.value.silentRequestSubscribe()
+      // 直接跳转到订单详情页
+      uni.navigateTo({
+        url: `/pages/order-detail/order-detail?id=${pendingOrderId}`
+      })
+      pendingOrderId = null
+    } else {
+      // 首次，显示自定义订阅授权弹窗
+      showSubscribePopup.value = true
+    }
   } catch (err) {
     uni.showToast({
       title: err.message || '下单失败',
       icon: 'none'
     })
+  }
+}
+
+const onSubscribeConfirm = (selectedTemplates) => {
+  console.log('用户选择的订阅模板:', selectedTemplates)
+
+  // 跳转到订单详情页
+  if (pendingOrderId) {
+    uni.navigateTo({
+      url: `/pages/order-detail/order-detail?id=${pendingOrderId}`
+    })
+    pendingOrderId = null
+  }
+}
+
+const onSubscribeCancel = () => {
+  console.log('用户取消了订阅授权')
+
+  // 即使取消订阅，也跳转到订单详情页
+  if (pendingOrderId) {
+    uni.navigateTo({
+      url: `/pages/order-detail/order-detail?id=${pendingOrderId}`
+    })
+    pendingOrderId = null
   }
 }
 
@@ -292,9 +363,9 @@ onShow(() => {
 }
 
 .search-header {
-  padding: 20rpx;
+  padding: 16rpx 24rpx;
   background-color: #ffffff;
-  box-shadow: 0 2rpx 10rpx rgba(0, 0, 0, 0.05);
+  box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.04);
   position: sticky;
   top: 0;
   z-index: 100;
@@ -305,18 +376,33 @@ onShow(() => {
   align-items: center;
   background-color: #f5f5f5;
   border-radius: 40rpx;
-  padding: 15rpx 25rpx;
+  padding: 16rpx 28rpx;
+  position: relative;
+  transition: background-color 0.3s ease;
+}
+
+.search-line {
+  position: absolute;
+  left: 28rpx;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4rpx;
+  height: 24rpx;
+  background: linear-gradient(180deg, #FF6B6B, #FF8E53);
+  border-radius: 2rpx;
+  margin-right: 12rpx;
 }
 
 .search-icon {
   font-size: 28rpx;
-  margin-right: 15rpx;
+  margin-left: 16rpx;
 }
 
 .search-input {
   flex: 1;
   font-size: 28rpx;
   background-color: transparent;
+  padding-left: 16rpx;
 }
 
 .loading-container,
@@ -327,6 +413,21 @@ onShow(() => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 16rpx;
+}
+
+.loading-spinner {
+  width: 60rpx;
+  height: 60rpx;
+  border: 4rpx solid #f0f0f0;
+  border-top: 4rpx solid #FF6B6B;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 .loading-text {
@@ -334,10 +435,14 @@ onShow(() => {
   color: #999999;
 }
 
+.error-icon {
+  font-size: 64rpx;
+  margin-bottom: 8rpx;
+}
+
 .error-text {
   font-size: 28rpx;
   color: #FF6B6B;
-  margin-bottom: 20rpx;
 }
 
 .retry-text {
@@ -346,39 +451,43 @@ onShow(() => {
   text-decoration: underline;
 }
 
+.empty-icon {
+  font-size: 80rpx;
+  margin-bottom: 16rpx;
+}
+
 .empty-text {
   font-size: 28rpx;
   color: #999999;
 }
 
-.cart-bar-spacer {
-  height: 100rpx;
-}
-
 :deep(.product-scroll) {
-  padding-bottom: 100rpx;
+  padding-bottom: 120rpx;
 }
 
+/* 购物车底部栏 */
 .cart-bar {
   position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
-  height: 100rpx;
-  background-color: #333333;
+  height: 110rpx;
+  background-color: rgba(51, 51, 51, 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 30rpx;
   padding-bottom: calc(0rpx + env(safe-area-inset-bottom));
   z-index: 200;
-  border-radius: 20rpx 20rpx 0 0;
+  border-radius: 24rpx 24rpx 0 0;
 }
 
 .cart-bar-left {
   display: flex;
   align-items: center;
-  gap: 16rpx;
+  gap: 20rpx;
 }
 
 .cart-icon-wrapper {
@@ -386,26 +495,27 @@ onShow(() => {
 }
 
 .cart-icon {
-  font-size: 48rpx;
+  font-size: 52rpx;
 }
 
 .cart-badge {
   position: absolute;
-  top: -8rpx;
-  right: -12rpx;
-  background-color: #FF6B6B;
+  top: -10rpx;
+  right: -14rpx;
+  background: linear-gradient(135deg, #FF6B6B, #FF8E53);
   color: #fff;
   font-size: 20rpx;
-  min-width: 32rpx;
-  height: 32rpx;
-  line-height: 32rpx;
+  min-width: 36rpx;
+  height: 36rpx;
+  line-height: 36rpx;
   text-align: center;
-  border-radius: 16rpx;
-  padding: 0 6rpx;
+  border-radius: 18rpx;
+  padding: 0 8rpx;
+  font-weight: 600;
 }
 
 .cart-total-amount {
-  font-size: 36rpx;
+  font-size: 38rpx;
   font-weight: bold;
   color: #ffffff;
 }
@@ -416,14 +526,16 @@ onShow(() => {
 }
 
 .checkout-btn {
-  background-color: #FF6B6B;
+  background: linear-gradient(135deg, #FF6B6B 0%, #FF8E53 100%);
   color: #fff;
   font-size: 30rpx;
   font-weight: bold;
-  padding: 16rpx 40rpx;
+  padding: 18rpx 48rpx;
   border-radius: 40rpx;
+  box-shadow: 0 4rpx 16rpx rgba(255, 107, 107, 0.4);
 }
 
+/* 购物车弹出层 */
 .cart-popup-overlay {
   position: fixed;
   top: 0;
@@ -431,6 +543,18 @@ onShow(() => {
   right: 0;
   bottom: 0;
   z-index: 300;
+  visibility: hidden;
+  opacity: 0;
+  transition: all 0.3s ease;
+
+  &.show {
+    visibility: visible;
+    opacity: 1;
+
+    .cart-popup {
+      transform: translateY(0);
+    }
+  }
 }
 
 .cart-popup-mask {
@@ -448,43 +572,54 @@ onShow(() => {
   right: 0;
   bottom: 0;
   background-color: #ffffff;
-  border-radius: 24rpx 24rpx 0 0;
+  border-radius: 28rpx 28rpx 0 0;
   max-height: 70vh;
   display: flex;
   flex-direction: column;
   padding-bottom: calc(100rpx + env(safe-area-inset-bottom));
+  transform: translateY(100%);
+  transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 
 .cart-popup-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 30rpx;
+  padding: 30rpx 32rpx;
   border-bottom: 2rpx solid #f0f0f0;
 }
 
 .cart-popup-title {
-  font-size: 32rpx;
+  font-size: 34rpx;
   font-weight: bold;
   color: #333;
 }
 
 .cart-popup-close {
-  font-size: 36rpx;
-  color: #999;
-  padding: 10rpx;
+  width: 48rpx;
+  height: 48rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background-color: #f5f5f5;
+}
+
+.close-icon {
+  font-size: 28rpx;
+  color: #666;
 }
 
 .cart-popup-body {
   flex: 1;
   max-height: calc(70vh - 100rpx);
-  padding: 0 30rpx;
+  padding: 0 32rpx;
 }
 
 .cart-item {
   display: flex;
   padding: 24rpx 0;
-  border-bottom: 2rpx solid #f5f5f5;
+  border-bottom: 2rpx solid #f8f8f8;
 }
 
 .cart-item:last-child {
@@ -494,7 +629,7 @@ onShow(() => {
 .cart-item-image {
   width: 140rpx;
   height: 140rpx;
-  border-radius: 12rpx;
+  border-radius: 16rpx;
   background-color: #f5f5f5;
   flex-shrink: 0;
 }
@@ -506,7 +641,7 @@ onShow(() => {
   flex-direction: column;
   justify-content: space-between;
   min-width: 0;
-  padding-right: 30rpx;
+  padding-right: 20rpx;
 }
 
 .cart-item-name {
@@ -521,15 +656,16 @@ onShow(() => {
 .cart-item-specs {
   display: flex;
   gap: 8rpx;
-  margin-top: 6rpx;
+  margin-top: 8rpx;
+  flex-wrap: wrap;
 }
 
 .cart-item-spec {
   font-size: 22rpx;
   color: #999;
   background-color: #f5f5f5;
-  padding: 4rpx 12rpx;
-  border-radius: 4rpx;
+  padding: 4rpx 14rpx;
+  border-radius: 6rpx;
 }
 
 .cart-item-bottom {
@@ -540,7 +676,7 @@ onShow(() => {
 }
 
 .cart-item-price {
-  font-size: 30rpx;
+  font-size: 32rpx;
   color: #FF6B6B;
   font-weight: bold;
   flex-shrink: 0;
@@ -549,20 +685,34 @@ onShow(() => {
 .cart-item-stepper {
   display: flex;
   align-items: center;
-  gap: 16rpx;
+  gap: 8rpx;
   flex-shrink: 0;
 }
 
 .stepper-btn {
-  width: 52rpx;
-  height: 52rpx;
-  line-height: 52rpx;
+  width: 56rpx;
+  height: 56rpx;
+  line-height: 56rpx;
   text-align: center;
   font-size: 36rpx;
-  color: #333;
-  background-color: #f5f5f5;
   border-radius: 50%;
   flex-shrink: 0;
+  transition: all 0.2s ease;
+
+  &.minus {
+    color: #666;
+    background-color: #f5f5f5;
+  }
+
+  &.plus {
+    color: #fff;
+    background: linear-gradient(135deg, #FF6B6B, #FF8E53);
+    box-shadow: 0 2rpx 8rpx rgba(255, 107, 107, 0.3);
+  }
+
+  &:active {
+    transform: scale(0.9);
+  }
 }
 
 .stepper-value {
@@ -570,7 +720,7 @@ onShow(() => {
   text-align: center;
   font-size: 28rpx;
   color: #333;
-  font-weight: 500;
+  font-weight: 600;
   flex-shrink: 0;
 }
 
@@ -579,5 +729,13 @@ onShow(() => {
   text-align: center;
   font-size: 28rpx;
   color: #999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16rpx;
+}
+
+.cart-empty-icon {
+  font-size: 64rpx;
 }
 </style>

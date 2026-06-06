@@ -30,7 +30,17 @@ public class ProductVO {
     private String productImage;
 
     /**
+     * 商品描述
+     */
+    private String desc;
+
+    /**
      * 商品价格
      */
     private BigDecimal price;
+
+    /**
+     * 月销量
+     */
+    private Integer salesCount;
 }

@@ -79,6 +79,20 @@ public class OrderController {
         }
     }
 
+    @PutMapping("/{id}/complete")
+    public ResponseEntity<Result<Void>> completeOrder(@PathVariable Long id) {
+        try {
+            orderService.completeOrder(id);
+            return ResponseEntity.ok(Result.success("订单已完成", null));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest()
+                    .body(Result.error(400, e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(500)
+                    .body(Result.error(500, "系统错误：" + e.getMessage()));
+        }
+    }
+
     @GetMapping("/list")
     public ResponseEntity<Result<List<OrderListVO>>> getOrderList() {
         try {

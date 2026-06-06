@@ -69,6 +69,9 @@ public class OrderService {
     @Autowired
     private OptionValueRepository optionValueRepository;
 
+    @Autowired
+    private WxSubscribeService wxSubscribeService;
+
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
     @Transactional(rollbackFor = Exception.class)
@@ -203,7 +206,54 @@ public class OrderService {
         order.setOrderStatus(5);
         orderRepository.save(order);
 
+        // 发送订单取消通知
+        try {
+            wxSubscribeService.sendOrderCancelMessage(order);
+        } catch (Exception e) {
+            log.error("发送订单取消通知失败: orderNo={}", order.getOrderNo(), e);
+        }
+
         log.info("订单已取消: orderNo={}", order.getOrderNo());
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void completeOrder(Long orderId) {
+        Long userId = userInfoService.getCurrentUserId();
+        if (userId == null) {
+            throw new RuntimeException("用户未登录");
+        }
+
+        Orders order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new RuntimeException("订单不存在"));
+
+        if (!order.getUser().getId().equals(userId)) {
+            throw new RuntimeException("无权操作此订单");
+        }
+
+        if (order.getOrderStatus() == 5) {
+            throw new RuntimeException("订单已取消，无法完成");
+        }
+
+        if (order.getOrderStatus() == 4) {
+            throw new RuntimeException("订单已完成");
+        }
+
+        // 只有制作中(2)或待取餐(3)的状态才能完成
+        if (order.getOrderStatus() != 2 && order.getOrderStatus() != 3) {
+            throw new RuntimeException("当前订单状态无法完成");
+        }
+
+        order.setOrderStatus(4);
+        orderRepository.save(order);
+
+        // 发送用餐提醒通知
+        try {
+            wxSubscribeService.sendMealRemindMessage(order);
+        } catch (Exception e) {
+            log.error("发送用餐提醒通知失败: orderNo={}", order.getOrderNo(), e);
+        }
+
+        log.info("订单已完成: orderNo={}", order.getOrderNo());
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -254,6 +304,13 @@ public class OrderService {
         order.setPaymentMethod("余额支付");
         orderRepository.save(order);
 
+        // 发送下单成功通知
+        try {
+            wxSubscribeService.sendOrderFinishMessage(order);
+        } catch (Exception e) {
+            log.error("发送下单成功通知失败: orderNo={}", order.getOrderNo(), e);
+        }
+
         log.info("订单支付成功: orderNo={}, payAmount={}, pointsEarned={}", order.getOrderNo(), order.getPayAmount(), pointsEarned);
     }
 
@@ -269,13 +326,24 @@ public class OrderService {
         List<Orders> orders = orderRepository.findByUserOrderByCreatedAtDesc(user);
 
         return orders.stream()
-                .map(o -> OrderListVO.builder()
-                        .id(o.getId())
-                        .orderNo(o.getOrderNo())
-                        .payAmount(o.getPayAmount())
-                        .orderStatus(o.getOrderStatus())
-                        .createdAt(o.getCreatedAt())
-                        .build())
+                .map(o -> {
+                    List<OrderItem> items = orderItemRepository.findByOrder(o);
+                    List<OrderItemVO> itemVOs = items.stream()
+                            .map(this::toOrderItemVO)
+                            .collect(Collectors.toList());
+
+                    return OrderListVO.builder()
+                            .id(o.getId())
+                            .orderNo(o.getOrderNo())
+                            .payAmount(o.getPayAmount())
+                            .orderStatus(o.getOrderStatus())
+                            .diningType(o.getDiningType())
+                            .tableNumber(o.getTableNumber())
+                            .itemCount(items.size())
+                            .createdAt(o.getCreatedAt())
+                            .items(itemVOs)
+                            .build();
+                })
                 .collect(Collectors.toList());
     }
 

@@ -12,6 +12,8 @@ import com.zcl.repository.OrderRepository;
 import com.zcl.repository.UserRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -29,17 +31,22 @@ import java.util.List;
 @Service
 public class AdminOrderService {
 
+    private static final Logger log = LoggerFactory.getLogger(AdminOrderService.class);
+
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final UserRepository userRepository;
     private final ObjectMapper objectMapper;
+    private final WxSubscribeService wxSubscribeService;
 
     public AdminOrderService(OrderRepository orderRepository, OrderItemRepository orderItemRepository,
-                              UserRepository userRepository, ObjectMapper objectMapper) {
+                              UserRepository userRepository, ObjectMapper objectMapper,
+                              WxSubscribeService wxSubscribeService) {
         this.orderRepository = orderRepository;
         this.orderItemRepository = orderItemRepository;
         this.userRepository = userRepository;
         this.objectMapper = objectMapper;
+        this.wxSubscribeService = wxSubscribeService;
     }
 
     public PageResult<AdminOrderVO> getOrderList(int page, int size, Integer status, String keyword,
@@ -82,8 +89,27 @@ public class AdminOrderService {
     public void updateOrderStatus(Long id, Integer newStatus) {
         Orders order = orderRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("订单不存在"));
+
+        Integer oldStatus = order.getOrderStatus();
+        log.info("管理员更新订单状态: orderNo={}, oldStatus={}, newStatus={}", order.getOrderNo(), oldStatus, newStatus);
+
         order.setOrderStatus(newStatus);
         orderRepository.save(order);
+
+        // 根据状态变化发送相应的通知
+        try {
+            if (newStatus == 4) {
+                // 改为已完成，发送用餐提醒（不限制旧状态）
+                log.info("触发用餐提醒发送: orderNo={}", order.getOrderNo());
+                wxSubscribeService.sendMealRemindMessage(order);
+            } else if (newStatus == 5) {
+                // 任何状态 → 已取消，发送订单取消通知
+                log.info("触发订单取消通知发送: orderNo={}", order.getOrderNo());
+                wxSubscribeService.sendOrderCancelMessage(order);
+            }
+        } catch (Exception e) {
+            log.error("发送订单通知失败: orderNo={}, oldStatus={}, newStatus={}", order.getOrderNo(), oldStatus, newStatus, e);
+        }
     }
 
     private AdminOrderVO toOrderVO(Orders order) {

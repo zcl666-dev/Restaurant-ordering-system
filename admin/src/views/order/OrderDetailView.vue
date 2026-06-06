@@ -8,8 +8,11 @@
     <template v-if="order">
       <el-row :gutter="20">
         <el-col :span="12">
-          <el-card>
-            <template #header>订单信息</template>
+          <div class="detail-card">
+            <div class="detail-card-header">
+              <div class="detail-card-bar"></div>
+              <span class="detail-card-title">订单信息</span>
+            </div>
             <el-descriptions :column="1" border>
               <el-descriptions-item label="订单号">{{ order.orderNo }}</el-descriptions-item>
               <el-descriptions-item label="订单状态">
@@ -20,11 +23,14 @@
               <el-descriptions-item label="桌号">{{ order.tableNumber || '-' }}</el-descriptions-item>
               <el-descriptions-item label="备注">{{ order.remark || '-' }}</el-descriptions-item>
             </el-descriptions>
-          </el-card>
+          </div>
         </el-col>
         <el-col :span="12">
-          <el-card>
-            <template #header>用户 & 支付</template>
+          <div class="detail-card">
+            <div class="detail-card-header">
+              <div class="detail-card-bar"></div>
+              <span class="detail-card-title">用户 & 支付</span>
+            </div>
             <el-descriptions :column="1" border>
               <el-descriptions-item label="用户">
                 <div style="display:flex;align-items:center;gap:8px;">
@@ -35,7 +41,7 @@
               <el-descriptions-item label="订单总额">¥{{ order.totalAmount }}</el-descriptions-item>
               <el-descriptions-item label="优惠金额">¥{{ order.discountAmount }}</el-descriptions-item>
               <el-descriptions-item label="实付金额">
-                <span style="font-weight:700;color:#f56c6c;font-size:16px;">¥{{ order.payAmount }}</span>
+                <span style="font-weight:700;color:#FF6B6B;font-size:16px;">¥{{ order.payAmount }}</span>
               </el-descriptions-item>
               <el-descriptions-item label="支付状态">
                 <el-tag v-if="order.paymentStatus === 1" type="success" size="small">已支付</el-tag>
@@ -45,17 +51,20 @@
               <el-descriptions-item label="支付方式">{{ order.paymentMethod || '-' }}</el-descriptions-item>
               <el-descriptions-item label="获得积分">{{ order.pointsEarned }}</el-descriptions-item>
             </el-descriptions>
-          </el-card>
+          </div>
         </el-col>
       </el-row>
 
-      <el-card style="margin-top: 20px;">
-        <template #header>商品明细</template>
+      <div class="detail-card" style="margin-top: 20px;">
+        <div class="detail-card-header">
+          <div class="detail-card-bar"></div>
+          <span class="detail-card-title">商品明细</span>
+        </div>
         <el-table :data="order.items" border>
           <el-table-column label="图片" width="70">
             <template #default="{ row }">
               <el-image v-if="row.productImage" :src="row.productImage"
-                style="width:48px;height:48px;border-radius:4px;" fit="cover" />
+                style="width:48px;height:48px;border-radius:6px;" fit="cover" />
             </template>
           </el-table-column>
           <el-table-column prop="productName" label="商品名称" min-width="150" />
@@ -71,10 +80,12 @@
             <template #default="{ row }">¥{{ row.unitPrice }}</template>
           </el-table-column>
           <el-table-column label="小计" width="100">
-            <template #default="{ row }">¥{{ row.subtotalAmount }}</template>
+            <template #default="{ row }">
+              <span style="font-weight:600;">¥{{ row.subtotalAmount }}</span>
+            </template>
           </el-table-column>
         </el-table>
-      </el-card>
+      </div>
     </template>
   </div>
 </template>
@@ -102,3 +113,33 @@ function formatTime(t) {
   return t ? t.replace('T', ' ').substring(0, 19) : ''
 }
 </script>
+
+<style scoped>
+.detail-card {
+  background: #fff;
+  border-radius: 10px;
+  padding: 24px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+  border: 1px solid #f5f5f5;
+}
+
+.detail-card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.detail-card-bar {
+  width: 4px;
+  height: 18px;
+  background: linear-gradient(180deg, #FF6B6B, #FF8E53);
+  border-radius: 2px;
+}
+
+.detail-card-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+}
+</style>

@@ -1,20 +1,31 @@
 <template>
   <view class="order-detail-page">
     <view class="loading-container" v-if="isLoading">
+      <view class="loading-spinner"></view>
       <text class="loading-text">加载中...</text>
     </view>
 
     <template v-else-if="orderData">
       <view class="order-header">
-        <view class="order-status-badge" :class="statusClass">
-          {{ statusText }}
+        <view class="header-content">
+          <view class="status-icon-wrapper">
+            <text class="status-icon">{{ statusIcon }}</text>
+          </view>
+          <view class="header-text">
+            <view class="order-status-badge" :class="statusClass">
+              {{ statusText }}
+            </view>
+            <text class="order-no">订单号: {{ orderData.orderNo }}</text>
+            <text class="order-time">{{ orderData.createdAt }}</text>
+          </view>
         </view>
-        <text class="order-no">订单号: {{ orderData.orderNo }}</text>
-        <text class="order-time">{{ orderData.createdAt }}</text>
       </view>
 
       <view class="order-items">
-        <view class="section-title">商品明细</view>
+        <view class="section-title-row">
+          <view class="section-title-bar"></view>
+          <text class="section-title">商品明细</text>
+        </view>
         <view
           v-for="(item, idx) in orderData.items"
           :key="idx"
@@ -42,10 +53,16 @@
       </view>
 
       <view class="order-summary">
-        <view class="section-title">金额明细</view>
+        <view class="section-title-row">
+          <view class="section-title-bar"></view>
+          <text class="section-title">金额明细</text>
+        </view>
         <view class="summary-row">
           <text class="summary-label">实付金额</text>
-          <text class="summary-value pay">¥{{ orderData.payAmount.toFixed(2) }}</text>
+          <view class="summary-pay-wrapper">
+            <text class="summary-pay-symbol">¥</text>
+            <text class="summary-value pay">{{ orderData.payAmount.toFixed(2) }}</text>
+          </view>
         </view>
         <view class="summary-row" v-if="orderData.remark">
           <text class="summary-label">备注</text>
@@ -58,12 +75,17 @@
         <button class="action-btn pay-btn" @tap="handlePay">去支付</button>
       </view>
 
+      <view class="order-actions" v-else-if="orderData.orderStatus === 2 || orderData.orderStatus === 3">
+        <button class="action-btn complete-btn" @tap="handleComplete">确认完成</button>
+      </view>
+
       <view class="order-actions" v-else>
         <button class="action-btn done-btn" disabled>{{ statusText }}</button>
       </view>
     </template>
 
     <view class="error-container" v-else>
+      <text class="error-icon">📭</text>
       <text class="error-text">订单不存在</text>
     </view>
   </view>
@@ -72,7 +94,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
-import { getOrderDetail, cancelOrder, payOrder } from '@/api/order.js'
+import { getOrderDetail, cancelOrder, payOrder, completeOrder } from '@/api/order.js'
 
 const orderData = ref(null)
 const isLoading = ref(true)
@@ -92,12 +114,27 @@ const statusText = computed(() => {
   return map[orderData.value.orderStatus] || '未知'
 })
 
+const statusIcon = computed(() => {
+  if (!orderData.value) return ''
+  const map = {
+    0: '💳',
+    1: '✅',
+    2: '👨‍🍳',
+    3: '🔔',
+    4: '🎉',
+    5: '❌',
+    6: '↩️'
+  }
+  return map[orderData.value.orderStatus] || '📋'
+})
+
 const statusClass = computed(() => {
   if (!orderData.value) return ''
   const status = orderData.value.orderStatus
   if (status === 0) return 'status-pending'
-  if (status === 5 || status === 6) return 'status-cancelled'
-  return 'status-done'
+  if (status === 1 || status === 2 || status === 3) return 'status-processing'
+  if (status === 4) return 'status-done'
+  return 'status-cancelled'
 })
 
 const fetchOrderDetail = async () => {
@@ -154,6 +191,24 @@ const handlePay = async () => {
   })
 }
 
+const handleComplete = async () => {
+  uni.showModal({
+    title: '确认完成',
+    content: '确认已用餐完毕？',
+    success: async (res) => {
+      if (res.confirm) {
+        try {
+          await completeOrder(orderId)
+          uni.showToast({ title: '订单已完成', icon: 'success' })
+          fetchOrderDetail()
+        } catch (err) {
+          uni.showToast({ title: err.message || '操作失败', icon: 'none' })
+        }
+      }
+    }
+  })
+}
+
 onLoad((options) => {
   orderId = options.id
   fetchOrderDetail()
@@ -170,9 +225,25 @@ onLoad((options) => {
 .loading-container,
 .error-container {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   padding: 200rpx 0;
+  gap: 16rpx;
+}
+
+.loading-spinner {
+  width: 60rpx;
+  height: 60rpx;
+  border: 4rpx solid #f0f0f0;
+  border-top: 4rpx solid #FF6B6B;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 .loading-text {
@@ -180,53 +251,99 @@ onLoad((options) => {
   color: #999;
 }
 
+.error-icon {
+  font-size: 80rpx;
+}
+
 .error-text {
   font-size: 28rpx;
   color: #FF6B6B;
 }
 
+/* 订单头部 */
 .order-header {
-  background: linear-gradient(135deg, #FF6B6B, #FF8E53);
-  padding: 40rpx 30rpx;
-  color: #fff;
+  background: linear-gradient(135deg, #FF6B6B 0%, #FF8E53 100%);
+  padding: 48rpx 32rpx;
+  border-radius: 0 0 32rpx 32rpx;
+}
+
+.header-content {
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
+}
+
+.status-icon-wrapper {
+  width: 80rpx;
+  height: 80rpx;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.status-icon {
+  font-size: 40rpx;
+}
+
+.header-text {
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
 }
 
 .order-status-badge {
   display: inline-block;
   font-size: 36rpx;
   font-weight: bold;
-  margin-bottom: 16rpx;
+  color: #fff;
 }
 
 .order-no {
-  display: block;
   font-size: 24rpx;
-  opacity: 0.9;
-  margin-bottom: 8rpx;
+  color: rgba(255, 255, 255, 0.85);
 }
 
 .order-time {
-  display: block;
   font-size: 22rpx;
-  opacity: 0.7;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+/* 商品明细 */
+.section-title-row {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  padding: 24rpx 28rpx 16rpx;
+}
+
+.section-title-bar {
+  width: 6rpx;
+  height: 28rpx;
+  background: linear-gradient(180deg, #FF6B6B, #FF8E53);
+  border-radius: 3rpx;
 }
 
 .section-title {
-  font-size: 28rpx;
-  font-weight: bold;
+  font-size: 30rpx;
+  font-weight: 600;
   color: #333;
-  padding: 24rpx 30rpx 16rpx;
 }
 
 .order-items {
   background-color: #fff;
-  margin-top: 20rpx;
+  margin: 20rpx 24rpx 0;
+  border-radius: 20rpx;
+  overflow: hidden;
+  box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.04);
 }
 
 .order-item {
   display: flex;
-  padding: 20rpx 30rpx;
-  border-bottom: 2rpx solid #f5f5f5;
+  padding: 20rpx 28rpx;
+  border-bottom: 2rpx solid #f8f8f8;
 }
 
 .order-item:last-child {
@@ -234,9 +351,9 @@ onLoad((options) => {
 }
 
 .order-item-image {
-  width: 120rpx;
-  height: 120rpx;
-  border-radius: 12rpx;
+  width: 130rpx;
+  height: 130rpx;
+  border-radius: 16rpx;
   background-color: #f5f5f5;
   flex-shrink: 0;
 }
@@ -259,6 +376,7 @@ onLoad((options) => {
   display: flex;
   gap: 8rpx;
   margin-top: 6rpx;
+  flex-wrap: wrap;
 }
 
 .order-item-spec {
@@ -266,7 +384,7 @@ onLoad((options) => {
   color: #999;
   background-color: #f5f5f5;
   padding: 4rpx 12rpx;
-  border-radius: 4rpx;
+  border-radius: 6rpx;
 }
 
 .order-item-bottom {
@@ -277,32 +395,37 @@ onLoad((options) => {
 }
 
 .order-item-price {
-  font-size: 28rpx;
-  color: #FF6B6B;
-  font-weight: bold;
+  font-size: 26rpx;
+  color: #999;
 }
 
 .order-item-quantity {
   font-size: 26rpx;
   color: #666;
+  font-weight: 500;
 }
 
 .order-item-subtotal {
-  font-size: 28rpx;
+  font-size: 30rpx;
   color: #333;
-  font-weight: bold;
+  font-weight: 600;
 }
 
+/* 金额明细 */
 .order-summary {
   background-color: #fff;
-  margin-top: 20rpx;
+  margin: 20rpx 24rpx 0;
+  border-radius: 20rpx;
+  overflow: hidden;
+  box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.04);
 }
 
 .summary-row {
   display: flex;
   justify-content: space-between;
-  padding: 16rpx 30rpx;
-  border-bottom: 2rpx solid #f5f5f5;
+  align-items: center;
+  padding: 20rpx 28rpx;
+  border-bottom: 2rpx solid #f8f8f8;
 }
 
 .summary-row:last-child {
@@ -310,59 +433,88 @@ onLoad((options) => {
 }
 
 .summary-label {
-  font-size: 26rpx;
+  font-size: 28rpx;
   color: #666;
 }
 
+.summary-pay-wrapper {
+  display: flex;
+  align-items: baseline;
+  gap: 4rpx;
+}
+
+.summary-pay-symbol {
+  font-size: 24rpx;
+  font-weight: 600;
+  color: #FF6B6B;
+}
+
 .summary-value {
-  font-size: 26rpx;
+  font-size: 28rpx;
   color: #333;
 }
 
 .summary-value.pay {
-  font-size: 32rpx;
+  font-size: 36rpx;
   font-weight: bold;
   color: #FF6B6B;
 }
 
 .summary-value.remark {
   color: #999;
-  font-size: 24rpx;
+  font-size: 26rpx;
   max-width: 60%;
   text-align: right;
 }
 
+/* 操作按钮 */
 .order-actions {
   display: flex;
   justify-content: flex-end;
   gap: 24rpx;
-  padding: 40rpx 30rpx;
+  padding: 40rpx 28rpx;
+  padding-bottom: calc(40rpx + env(safe-area-inset-bottom));
 }
 
 .action-btn {
-  min-width: 180rpx;
-  height: 80rpx;
-  line-height: 80rpx;
+  min-width: 200rpx;
+  height: 88rpx;
+  line-height: 88rpx;
   text-align: center;
-  font-size: 28rpx;
-  font-weight: bold;
-  border-radius: 40rpx;
+  font-size: 30rpx;
+  font-weight: 600;
+  border-radius: 44rpx;
   border: none;
   padding: 0 40rpx;
+  transition: all 0.2s ease;
+}
+
+.action-btn:active {
+  transform: scale(0.95);
 }
 
 .cancel-btn {
-  background-color: #f5f5f5;
+  background-color: #fff;
   color: #666;
+  border: 2rpx solid #e0e0e0;
 }
 
 .pay-btn {
-  background: linear-gradient(135deg, #FF6B6B, #FF8E53);
+  background: linear-gradient(135deg, #FF6B6B 0%, #FF8E53 100%);
   color: #fff;
+  box-shadow: 0 8rpx 24rpx rgba(255, 107, 107, 0.3);
 }
 
 .done-btn {
-  background-color: #e0e0e0;
+  background-color: #f0f0f0;
   color: #999;
+  min-width: 400rpx;
+}
+
+.complete-btn {
+  background: linear-gradient(135deg, #128812 0%, #1aad19 100%);
+  color: #fff;
+  min-width: 400rpx;
+  box-shadow: 0 8rpx 24rpx rgba(18, 136, 18, 0.3);
 }
 </style>
