@@ -1,54 +1,49 @@
 package com.zcl.service;
 
+import com.zcl.dao.SubscribeTemplateDao;
+import com.zcl.dao.UserDao;
 import com.zcl.dto.SubscribeSaveRequest;
 import com.zcl.entity.SubscribeTemplate;
 import com.zcl.entity.User;
-import com.zcl.repository.SubscribeTemplateRepository;
-import com.zcl.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.Optional;
 
 @Service
+@Transactional
 public class SubscribeService {
 
     @Autowired
-    private SubscribeTemplateRepository subscribeTemplateRepository;
+    private SubscribeTemplateDao subscribeTemplateDao;
 
     @Autowired
-    private UserRepository userRepository;
+    private UserDao userDao;
 
-    @Autowired
-    private UserInfoService userInfoService;
-
-    @Transactional(rollbackFor = Exception.class)
-    public void save(SubscribeSaveRequest request) {
-        Long userId = userInfoService.getCurrentUserId();
+    public void saveSubscribe(Long userId, SubscribeSaveRequest request) {
         if (userId == null) {
             throw new RuntimeException("用户未登录");
         }
 
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("用户不存在"));
+        User user = userDao.findById(userId);
+        if (user == null) {
+            throw new RuntimeException("用户不存在");
+        }
 
-        Optional<SubscribeTemplate> existing = subscribeTemplateRepository
-                .findByUserAndTemplateId(user, request.getTemplateId());
+        SubscribeTemplate existing = subscribeTemplateDao.findByTemplateId(request.getTemplateId());
 
-        if (existing.isPresent()) {
-            SubscribeTemplate record = existing.get();
-            record.setStatus(request.getStatus());
-            record.setAcceptedAt(LocalDateTime.now());
-            subscribeTemplateRepository.save(record);
+        if (existing != null) {
+            existing.setStatus(request.getStatus());
+            existing.setAcceptedAt(LocalDateTime.now());
+            subscribeTemplateDao.save(existing);
         } else {
             SubscribeTemplate record = new SubscribeTemplate();
             record.setUser(user);
             record.setTemplateId(request.getTemplateId());
             record.setStatus(request.getStatus());
             record.setAcceptedAt(LocalDateTime.now());
-            subscribeTemplateRepository.save(record);
+            subscribeTemplateDao.save(record);
         }
     }
 }

@@ -2,20 +2,22 @@ package com.zcl.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.zcl.dao.OrderItemDao;
+import com.zcl.dao.SubscribeTemplateDao;
 import com.zcl.entity.OrderItem;
 import com.zcl.entity.Orders;
 import com.zcl.entity.SubscribeTemplate;
 import com.zcl.entity.User;
-import com.zcl.repository.OrderItemRepository;
-import com.zcl.repository.SubscribeTemplateRepository;
-import com.zcl.repository.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestClient;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -25,6 +27,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
+@Transactional
 public class WxSubscribeService {
 
     private static final Logger log = LoggerFactory.getLogger(WxSubscribeService.class);
@@ -44,29 +47,21 @@ public class WxSubscribeService {
     private String secret;
 
     @Autowired
-    private SubscribeTemplateRepository subscribeTemplateRepository;
+    private SubscribeTemplateDao subscribeTemplateDao;
 
     @Autowired
-    private UserRepository userRepository;
+    private OrderItemDao orderItemDao;
 
-    @Autowired
-    private OrderItemRepository orderItemRepository;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
-    private final RestClient restClient;
-    private final ObjectMapper objectMapper;
+    private final RestTemplate restTemplate = new RestTemplate();
 
     // 缓存 access_token
     private String cachedAccessToken;
     private long accessTokenExpireTime;
 
-    public WxSubscribeService(ObjectMapper objectMapper) {
-        this.restClient = RestClient.create();
-        this.objectMapper = objectMapper;
-    }
-
     /**
      * 发送下单成功通知
-     * 模板字段：character_string3=订单编号, time7=下单时间, thing6=订单内容, thing11=桌号, amount4=订单金额
      */
     public void sendOrderFinishMessage(Orders order) {
         User user = order.getUser();
@@ -82,7 +77,6 @@ public class WxSubscribeService {
 
     /**
      * 发送订单取消通知
-     * 模板字段：thing1=门店名称, character_string3=订单号, date7=取消时间, amount4=订单金额, thing2=取消原因
      */
     public void sendOrderCancelMessage(Orders order) {
         User user = order.getUser();
@@ -98,7 +92,6 @@ public class WxSubscribeService {
 
     /**
      * 发送用餐提醒通知
-     * 模板字段：thing9=门店名称, date1=用餐时间, thing3=点餐内容, character_string14=座位号
      */
     public void sendMealRemindMessage(Orders order) {
         User user = order.getUser();
@@ -112,7 +105,7 @@ public class WxSubscribeService {
     }
 
     /**
-     * 截断字符串，防止超出微信字段长度限制
+     * 截断字符串
      */
     private String truncate(String str, int maxLength) {
         if (str == null) return "";
@@ -123,7 +116,7 @@ public class WxSubscribeService {
      * 获取订单商品内容摘要
      */
     private String getOrderContent(Orders order) {
-        List<OrderItem> items = orderItemRepository.findByOrder(order);
+        List<OrderItem> items = orderItemDao.findByOrder(order);
         if (items.isEmpty()) return "无商品";
         return items.stream()
                 .map(item -> item.getProductNameSnapshot() + "x" + item.getQuantity())
@@ -136,9 +129,9 @@ public class WxSubscribeService {
     private void sendMessage(User user, String templateId, Map<String, String> data, Long orderId) {
         try {
             // 1. 检查用户是否订阅了该模板
-            List<SubscribeTemplate> subscriptions = subscribeTemplateRepository.findByUserAndStatus(user, 1);
+            List<SubscribeTemplate> subscriptions = subscribeTemplateDao.findByUserId(user.getId());
             boolean hasSubscription = subscriptions.stream()
-                    .anyMatch(sub -> sub.getTemplateId().equals(templateId));
+                    .anyMatch(sub -> sub.getTemplateId().equals(templateId) && sub.getStatus() == 1);
 
             if (!hasSubscription) {
                 log.info("用户 {} 未订阅模板 {}，跳过发送", user.getId(), templateId);
@@ -155,8 +148,6 @@ public class WxSubscribeService {
                 return;
             }
 
-            log.info("获取 access_token 成功");
-
             // 3. 构建请求体
             Map<String, Object> requestBody = new HashMap<>();
             requestBody.put("touser", user.getOpenId());
@@ -165,18 +156,15 @@ public class WxSubscribeService {
             requestBody.put("data", convertToWxData(data));
 
             String requestBodyJson = objectMapper.writeValueAsString(requestBody);
-            log.info("请求体: {}", requestBodyJson);
 
             // 4. 发送请求
             String url = String.format(WX_SUBSCRIBE_MESSAGE_URL, accessToken);
-            log.info("请求URL: {}", url);
 
-            String response = restClient.post()
-                    .uri(url)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .body(requestBodyJson)
-                    .retrieve()
-                    .body(String.class);
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            HttpEntity<String> entity = new HttpEntity<>(requestBodyJson, headers);
+
+            String response = restTemplate.postForObject(url, entity, String.class);
 
             log.info("微信API响应: {}", response);
 
@@ -200,20 +188,13 @@ public class WxSubscribeService {
     private String getAccessToken() {
         // 检查缓存是否有效
         if (cachedAccessToken != null && System.currentTimeMillis() < accessTokenExpireTime) {
-            log.info("使用缓存的 access_token");
             return cachedAccessToken;
         }
 
         try {
             String url = String.format(WX_ACCESS_TOKEN_URL, appid, secret);
-            log.info("请求 access_token: appid={}", appid);
 
-            String response = restClient.get()
-                    .uri(url)
-                    .retrieve()
-                    .body(String.class);
-
-            log.info("access_token 响应: {}", response);
+            String response = restTemplate.getForObject(url, String.class);
 
             JsonNode jsonNode = objectMapper.readTree(response);
 
@@ -224,7 +205,7 @@ public class WxSubscribeService {
 
             cachedAccessToken = jsonNode.get("access_token").asText();
             int expiresIn = jsonNode.get("expires_in").asInt();
-            accessTokenExpireTime = System.currentTimeMillis() + (expiresIn - 300) * 1000L; // 提前5分钟过期
+            accessTokenExpireTime = System.currentTimeMillis() + (expiresIn - 300) * 1000L;
 
             return cachedAccessToken;
         } catch (Exception e) {

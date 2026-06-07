@@ -3,7 +3,6 @@ package com.zcl.util;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
@@ -20,16 +19,22 @@ import java.util.Map;
 public class JwtUtil {
 
     /**
-     * JWT 密钥（从配置文件读取）
+     * JWT 密钥
      */
-    @Value("${jwt.secret:defaultSecretKeyForJwtTokenGenerationAndValidation123456789}")
-    private String secret;
+    private String secret = "defaultSecretKeyForJwtTokenGenerationAndValidation123456789";
 
     /**
      * Token 有效期（毫秒），默认 7 天
      */
-    @Value("${jwt.expiration:604800000}")
-    private Long expiration;
+    private Long expiration = 604800000L;
+
+    public void setSecret(String secret) {
+        this.secret = secret;
+    }
+
+    public void setExpiration(Long expiration) {
+        this.expiration = expiration;
+    }
 
     /**
      * 生成 SecretKey
@@ -40,11 +45,6 @@ public class JwtUtil {
 
     /**
      * 生成 JWT Token
-     *
-     * @param openId   微信用户唯一标识
-     * @param userId   用户ID
-     * @param nickName 用户昵称
-     * @return JWT Token 字符串
      */
     public String generateToken(String openId, Long userId, String nickName) {
         Map<String, Object> claims = new HashMap<>();
@@ -66,9 +66,6 @@ public class JwtUtil {
 
     /**
      * 从 Token 中解析 Claims
-     *
-     * @param token JWT Token
-     * @return Claims 对象
      */
     public Claims parseToken(String token) {
         return Jwts.parser()
@@ -80,9 +77,6 @@ public class JwtUtil {
 
     /**
      * 从 Token 中获取 openId
-     *
-     * @param token JWT Token
-     * @return openId
      */
     public String getOpenIdFromToken(String token) {
         Claims claims = parseToken(token);
@@ -91,9 +85,6 @@ public class JwtUtil {
 
     /**
      * 从 Token 中获取 userId
-     *
-     * @param token JWT Token
-     * @return userId
      */
     public Long getUserIdFromToken(String token) {
         Claims claims = parseToken(token);
@@ -102,9 +93,6 @@ public class JwtUtil {
 
     /**
      * 从 Token 中获取 nickName
-     *
-     * @param token JWT Token
-     * @return nickName
      */
     public String getNickNameFromToken(String token) {
         Claims claims = parseToken(token);
@@ -113,9 +101,6 @@ public class JwtUtil {
 
     /**
      * 验证 Token 是否有效
-     *
-     * @param token JWT Token
-     * @return 是否有效
      */
     public boolean validateToken(String token) {
         try {
@@ -125,8 +110,6 @@ public class JwtUtil {
             return false;
         }
     }
-
-    // ==================== Admin Token Methods ====================
 
     /**
      * 生成管理员 JWT Token

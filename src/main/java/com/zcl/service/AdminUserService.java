@@ -1,63 +1,72 @@
 package com.zcl.service;
 
+import com.zcl.dao.UserDao;
 import com.zcl.dto.AdminUserVO;
 import com.zcl.dto.PageResult;
 import com.zcl.entity.User;
-import com.zcl.repository.UserRepository;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 @Service
+@Transactional
 public class AdminUserService {
 
-    private final UserRepository userRepository;
-
-    public AdminUserService(UserRepository userRepository) {
-        this.userRepository = userRepository;
-    }
+    @Autowired
+    private UserDao userDao;
 
     public PageResult<AdminUserVO> getUserList(int page, int size, String keyword) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
-        Page<User> userPage;
+        int offset = page * size;
+        List<User> users;
+        long totalElements;
 
         if (keyword != null && !keyword.trim().isEmpty()) {
-            userPage = userRepository.findByNickNameContaining(keyword.trim(), pageable);
+            users = userDao.findByNickNameContaining(keyword.trim(), offset, size);
+            totalElements = userDao.countByNickNameContaining(keyword.trim());
         } else {
-            userPage = userRepository.findAll(pageable);
+            users = userDao.findAllWithPaging(offset, size);
+            totalElements = userDao.count();
         }
 
+        List<AdminUserVO> content = users.stream().map(this::toVO).toList();
+
         return PageResult.<AdminUserVO>builder()
-                .content(userPage.getContent().stream().map(this::toVO).toList())
-                .totalElements(userPage.getTotalElements())
-                .totalPages(userPage.getTotalPages())
+                .content(content)
+                .totalElements(totalElements)
+                .totalPages((int) Math.ceil((double) totalElements / size))
                 .currentPage(page)
                 .pageSize(size)
                 .build();
     }
 
     public AdminUserVO getUserDetail(Long id) {
-        User user = userRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("用户不存在"));
+        User user = userDao.findById(id);
+        if (user == null) {
+            throw new RuntimeException("用户不存在");
+        }
         return toVO(user);
     }
 
     public void updateUser(Long id, AdminUserVO vo) {
-        User user = userRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("用户不存在"));
+        User user = userDao.findById(id);
+        if (user == null) {
+            throw new RuntimeException("用户不存在");
+        }
         if (vo.getBalance() != null) user.setBalance(vo.getBalance());
         if (vo.getPointsBalance() != null) user.setPointsBalance(vo.getPointsBalance());
         if (vo.getStatus() != null) user.setStatus(vo.getStatus());
-        userRepository.save(user);
+        userDao.save(user);
     }
 
     public void deleteUser(Long id) {
-        User user = userRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("用户不存在"));
+        User user = userDao.findById(id);
+        if (user == null) {
+            throw new RuntimeException("用户不存在");
+        }
         user.setStatus(0);
-        userRepository.save(user);
+        userDao.save(user);
     }
 
     private AdminUserVO toVO(User user) {

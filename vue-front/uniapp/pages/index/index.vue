@@ -89,7 +89,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 
 const images = reactive([
   { src: '/static/pic1.jpg', loaded: false, error: false },
@@ -107,6 +107,37 @@ const greetingText = computed(() => {
   if (hour < 18) return '下午好 🌅'
   return '晚上好 🌙'
 })
+
+// 页面加载时获取桌号参数
+onMounted(() => {
+  // #ifdef MP-WEIXIN
+  // 小程序环境下从页面参数获取桌号
+  const pages = getCurrentPages()
+  const currentPage = pages[pages.length - 1]
+  const options = currentPage?.options || {}
+  if (options.tableNo) {
+    uni.setStorageSync('tableNo', options.tableNo)
+    uni.showToast({
+      title: `已识别桌号: ${options.tableNo}`,
+      icon: 'success'
+    })
+  }
+  // #endif
+})
+
+// 页面显示时也检查参数（处理扫码进入场景）
+const onLoad = (options) => {
+  if (options && options.tableNo) {
+    uni.setStorageSync('tableNo', options.tableNo)
+    uni.showToast({
+      title: `已识别桌号: ${options.tableNo}`,
+      icon: 'success'
+    })
+  }
+}
+
+// 导出onLoad供页面使用
+defineExpose({ onLoad })
 
 const onSwiperChange = (e) => {
   currentIndex.value = e.detail.current

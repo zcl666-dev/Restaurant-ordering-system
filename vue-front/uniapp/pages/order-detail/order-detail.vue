@@ -64,6 +64,29 @@
             <text class="summary-value pay">{{ orderData.payAmount.toFixed(2) }}</text>
           </view>
         </view>
+        <view class="summary-row" v-if="orderData.orderStatus === 0">
+          <text class="summary-label">就餐方式</text>
+          <view class="dining-type-selector">
+            <text
+              class="dining-option"
+              :class="{ active: orderData.diningType === '1' }"
+              @tap="handleDiningTypeChange(1)"
+            >堂食</text>
+            <text
+              class="dining-option"
+              :class="{ active: orderData.diningType === '2' }"
+              @tap="handleDiningTypeChange(2)"
+            >打包</text>
+          </view>
+        </view>
+        <view class="summary-row" v-else>
+          <text class="summary-label">就餐方式</text>
+          <text class="summary-value">{{ orderData.diningType === '1' ? '堂食' : '打包' }}</text>
+        </view>
+        <view class="summary-row" v-if="orderData.tableNumber">
+          <text class="summary-label">桌号</text>
+          <text class="summary-value">{{ orderData.tableNumber }}</text>
+        </view>
         <view class="summary-row" v-if="orderData.remark">
           <text class="summary-label">备注</text>
           <text class="summary-value remark">{{ orderData.remark }}</text>
@@ -75,7 +98,7 @@
         <button class="action-btn pay-btn" @tap="handlePay">去支付</button>
       </view>
 
-      <view class="order-actions" v-else-if="orderData.orderStatus === 2 || orderData.orderStatus === 3">
+      <view class="order-actions" v-else-if="orderData.orderStatus === 3">
         <button class="action-btn complete-btn" @tap="handleComplete">确认完成</button>
       </view>
 
@@ -94,7 +117,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
-import { getOrderDetail, cancelOrder, payOrder, completeOrder } from '@/api/order.js'
+import { getOrderDetail, cancelOrder, payOrder, completeOrder, updateOrderDiningType } from '@/api/order.js'
 
 const orderData = ref(null)
 const isLoading = ref(true)
@@ -189,6 +212,18 @@ const handlePay = async () => {
       }
     }
   })
+}
+
+const handleDiningTypeChange = async (type) => {
+  if (orderData.value.diningType === String(type)) return
+
+  try {
+    await updateOrderDiningType(orderId, type)
+    orderData.value.diningType = String(type)
+    uni.showToast({ title: '已切换为' + (type === 1 ? '堂食' : '打包'), icon: 'none' })
+  } catch (err) {
+    uni.showToast({ title: err.message || '切换失败', icon: 'none' })
+  }
 }
 
 const handleComplete = async () => {
@@ -458,6 +493,27 @@ onLoad((options) => {
   font-size: 36rpx;
   font-weight: bold;
   color: #FF6B6B;
+}
+
+.dining-type-selector {
+  display: flex;
+  background-color: #f5f5f5;
+  border-radius: 32rpx;
+  padding: 4rpx;
+}
+
+.dining-option {
+  font-size: 26rpx;
+  color: #999;
+  padding: 12rpx 32rpx;
+  border-radius: 28rpx;
+  transition: all 0.2s ease;
+
+  &.active {
+    background: linear-gradient(135deg, #FF6B6B, #FF8E53);
+    color: #fff;
+    font-weight: 600;
+  }
 }
 
 .summary-value.remark {

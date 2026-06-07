@@ -2,27 +2,9 @@ package com.zcl.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.zcl.dto.OptionVO;
-import com.zcl.dto.OrderCreateResponse;
-import com.zcl.dto.OrderDetailVO;
-import com.zcl.dto.OrderItemVO;
-import com.zcl.dto.OrderListVO;
-import com.zcl.entity.Cart;
-import com.zcl.entity.CartItem;
-import com.zcl.entity.OptionGroup;
-import com.zcl.entity.OptionValue;
-import com.zcl.entity.OrderItem;
-import com.zcl.entity.Orders;
-import com.zcl.entity.Product;
-import com.zcl.entity.User;
-import com.zcl.repository.CartItemRepository;
-import com.zcl.repository.CartRepository;
-import com.zcl.repository.OptionGroupRepository;
-import com.zcl.repository.OptionValueRepository;
-import com.zcl.repository.OrderItemRepository;
-import com.zcl.repository.OrderRepository;
-import com.zcl.repository.ProductRepository;
-import com.zcl.repository.UserRepository;
+import com.zcl.dao.*;
+import com.zcl.dto.*;
+import com.zcl.entity.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,62 +14,66 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 import java.util.stream.Collectors;
 
 @Service
+@Transactional
 public class OrderService {
 
     private static final Logger log = LoggerFactory.getLogger(OrderService.class);
 
     @Autowired
-    private OrderRepository orderRepository;
+    private OrderDao orderDao;
 
     @Autowired
-    private OrderItemRepository orderItemRepository;
+    private OrderItemDao orderItemDao;
 
     @Autowired
-    private CartRepository cartRepository;
+    private CartDao cartDao;
 
     @Autowired
-    private CartItemRepository cartItemRepository;
+    private CartItemDao cartItemDao;
 
     @Autowired
-    private UserRepository userRepository;
+    private UserDao userDao;
 
     @Autowired
-    private ProductRepository productRepository;
+    private ProductDao productDao;
 
     @Autowired
-    private UserInfoService userInfoService;
+    private OptionGroupDao optionGroupDao;
 
     @Autowired
-    private OptionGroupRepository optionGroupRepository;
-
-    @Autowired
-    private OptionValueRepository optionValueRepository;
+    private OptionValueDao optionValueDao;
 
     @Autowired
     private WxSubscribeService wxSubscribeService;
 
+    @Autowired
+    private PointLogDao pointLogDao;
+
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
-    @Transactional(rollbackFor = Exception.class)
-    public OrderCreateResponse createOrder() {
-        Long userId = userInfoService.getCurrentUserId();
+    public OrderCreateResponse createOrder(Long userId, Integer diningType, String tableNumber, String remark) {
         if (userId == null) {
             throw new RuntimeException("用户未登录");
         }
 
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("用户不存在"));
+        User user = userDao.findById(userId);
+        if (user == null) {
+            throw new RuntimeException("用户不存在");
+        }
 
-        Cart cart = cartRepository.findByUserAndCartStatus(user, "active")
-                .orElseThrow(() -> new RuntimeException("购物车为空"));
+        Cart cart = cartDao.findByUser(user);
+        if (cart == null) {
+            throw new RuntimeException("购物车为空");
+        }
 
-        List<CartItem> cartItems = cartItemRepository.findByCart(cart);
+        List<CartItem> cartItems = cartItemDao.findByCart(cart);
         if (cartItems.isEmpty()) {
             throw new RuntimeException("购物车中没有商品");
         }
@@ -105,7 +91,7 @@ public class OrderService {
         for (CartItem ci : cartItems) {
             Product product = ci.getProduct();
             product.setStock(product.getStock() - ci.getQuantity());
-            productRepository.save(product);
+            productDao.save(product);
         }
 
         String orderNo = generateOrderNo();
@@ -120,10 +106,10 @@ public class OrderService {
         order.setPointsEarned(0);
         order.setOrderStatus(0);
         order.setPaymentStatus(0);
-        order.setRemark(cart.getRemark());
-        order.setDiningType(cart.getDiningType());
-        order.setTableNumber(cart.getTableNumber());
-        order = orderRepository.save(order);
+        order.setRemark(remark);
+        order.setDiningType(String.valueOf(diningType));
+        order.setTableNumber(tableNumber);
+        orderDao.save(order);
 
         for (CartItem ci : cartItems) {
             OrderItem orderItem = new OrderItem();
@@ -135,31 +121,36 @@ public class OrderService {
             orderItem.setQuantity(ci.getQuantity());
             orderItem.setUnitPrice(ci.getUnitPrice());
             orderItem.setSubtotalAmount(ci.getSubtotalAmount());
-            orderItemRepository.save(orderItem);
+            orderItemDao.save(orderItem);
         }
 
-        cart.setCartStatus("converted");
-        cartRepository.save(cart);
+        // 清空购物车
+        cartItemDao.deleteByCart(cart);
+        cart.setCartStatus("active");
+        cart.setTotalQuantity(0);
+        cart.setTotalAmount(BigDecimal.ZERO);
+        cartDao.save(cart);
 
         log.info("订单创建成功: orderNo={}, userId={}, payAmount={}", orderNo, userId, order.getPayAmount());
 
         return OrderCreateResponse.builder().orderId(order.getId()).build();
     }
 
-    public OrderDetailVO getOrderDetail(Long orderId) {
-        Long userId = userInfoService.getCurrentUserId();
+    public OrderDetailVO getOrderDetail(Long userId, Long orderId) {
         if (userId == null) {
             throw new RuntimeException("用户未登录");
         }
 
-        Orders order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new RuntimeException("订单不存在"));
+        Orders order = orderDao.findById(orderId);
+        if (order == null) {
+            throw new RuntimeException("订单不存在");
+        }
 
         if (!order.getUser().getId().equals(userId)) {
             throw new RuntimeException("无权查看此订单");
         }
 
-        List<OrderItem> items = orderItemRepository.findByOrder(order);
+        List<OrderItem> items = orderItemDao.findByOrder(order);
         List<OrderItemVO> itemVOs = items.stream()
                 .map(this::toOrderItemVO)
                 .collect(Collectors.toList());
@@ -170,21 +161,23 @@ public class OrderService {
                 .orderStatus(order.getOrderStatus())
                 .paymentStatus(order.getPaymentStatus())
                 .payAmount(order.getPayAmount())
+                .diningType(order.getDiningType())
+                .tableNumber(order.getTableNumber())
                 .remark(order.getRemark())
                 .createdAt(order.getCreatedAt())
                 .items(itemVOs)
                 .build();
     }
 
-    @Transactional(rollbackFor = Exception.class)
-    public void cancelOrder(Long orderId) {
-        Long userId = userInfoService.getCurrentUserId();
+    public void cancelOrder(Long userId, Long orderId) {
         if (userId == null) {
             throw new RuntimeException("用户未登录");
         }
 
-        Orders order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new RuntimeException("订单不存在"));
+        Orders order = orderDao.findById(orderId);
+        if (order == null) {
+            throw new RuntimeException("订单不存在");
+        }
 
         if (!order.getUser().getId().equals(userId)) {
             throw new RuntimeException("无权操作此订单");
@@ -194,17 +187,17 @@ public class OrderService {
             throw new RuntimeException("只有待支付订单才能取消");
         }
 
-        List<OrderItem> items = orderItemRepository.findByOrder(order);
+        List<OrderItem> items = orderItemDao.findByOrder(order);
         for (OrderItem item : items) {
             Product product = item.getProduct();
             if (product != null) {
                 product.setStock(product.getStock() + item.getQuantity());
-                productRepository.save(product);
+                productDao.save(product);
             }
         }
 
         order.setOrderStatus(5);
-        orderRepository.save(order);
+        orderDao.save(order);
 
         // 发送订单取消通知
         try {
@@ -216,15 +209,39 @@ public class OrderService {
         log.info("订单已取消: orderNo={}", order.getOrderNo());
     }
 
-    @Transactional(rollbackFor = Exception.class)
-    public void completeOrder(Long orderId) {
-        Long userId = userInfoService.getCurrentUserId();
+    public void updateDiningType(Long userId, Long orderId, Integer diningType) {
         if (userId == null) {
             throw new RuntimeException("用户未登录");
         }
 
-        Orders order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new RuntimeException("订单不存在"));
+        Orders order = orderDao.findById(orderId);
+        if (order == null) {
+            throw new RuntimeException("订单不存在");
+        }
+
+        if (!order.getUser().getId().equals(userId)) {
+            throw new RuntimeException("无权操作此订单");
+        }
+
+        if (order.getOrderStatus() != 0) {
+            throw new RuntimeException("只有待支付订单才能修改就餐方式");
+        }
+
+        order.setDiningType(String.valueOf(diningType));
+        orderDao.save(order);
+
+        log.info("更新就餐方式: orderId={}, diningType={}", orderId, diningType);
+    }
+
+    public void completeOrder(Long userId, Long orderId) {
+        if (userId == null) {
+            throw new RuntimeException("用户未登录");
+        }
+
+        Orders order = orderDao.findById(orderId);
+        if (order == null) {
+            throw new RuntimeException("订单不存在");
+        }
 
         if (!order.getUser().getId().equals(userId)) {
             throw new RuntimeException("无权操作此订单");
@@ -244,7 +261,7 @@ public class OrderService {
         }
 
         order.setOrderStatus(4);
-        orderRepository.save(order);
+        orderDao.save(order);
 
         // 发送用餐提醒通知
         try {
@@ -256,15 +273,15 @@ public class OrderService {
         log.info("订单已完成: orderNo={}", order.getOrderNo());
     }
 
-    @Transactional(rollbackFor = Exception.class)
-    public void payOrder(Long orderId) {
-        Long userId = userInfoService.getCurrentUserId();
+    public void payOrder(Long userId, Long orderId) {
         if (userId == null) {
             throw new RuntimeException("用户未登录");
         }
 
-        Orders order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new RuntimeException("订单不存在"));
+        Orders order = orderDao.findById(orderId);
+        if (order == null) {
+            throw new RuntimeException("订单不存在");
+        }
 
         if (!order.getUser().getId().equals(userId)) {
             throw new RuntimeException("无权操作此订单");
@@ -295,14 +312,26 @@ public class OrderService {
 
         user.setTotalSpentAmount(user.getTotalSpentAmount().add(order.getPayAmount()));
         user.setTotalOrderCount(user.getTotalOrderCount() + 1);
-        userRepository.save(user);
+        userDao.save(user);
 
         order.setPaymentStatus(1);
         order.setOrderStatus(2);
         order.setPaymentTime(LocalDateTime.now());
         order.setPointsEarned(pointsEarned);
         order.setPaymentMethod("余额支付");
-        orderRepository.save(order);
+        orderDao.save(order);
+
+        // 记录积分流水
+        if (pointsEarned > 0) {
+            PointLog pointLog = new PointLog();
+            pointLog.setUser(user);
+            pointLog.setOrder(order);
+            pointLog.setType(1); // 1=获得
+            pointLog.setPointsChange(pointsEarned);
+            pointLog.setBalanceAfter(user.getPointsBalance());
+            pointLog.setRemark("订单支付获得积分");
+            pointLogDao.save(pointLog);
+        }
 
         // 发送下单成功通知
         try {
@@ -314,20 +343,16 @@ public class OrderService {
         log.info("订单支付成功: orderNo={}, payAmount={}, pointsEarned={}", order.getOrderNo(), order.getPayAmount(), pointsEarned);
     }
 
-    public List<OrderListVO> getOrderList() {
-        Long userId = userInfoService.getCurrentUserId();
+    public List<OrderListVO> getOrderList(Long userId) {
         if (userId == null) {
             return Collections.emptyList();
         }
 
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("用户不存在"));
-
-        List<Orders> orders = orderRepository.findByUserOrderByCreatedAtDesc(user);
+        List<Orders> orders = orderDao.findByUserId(userId);
 
         return orders.stream()
                 .map(o -> {
-                    List<OrderItem> items = orderItemRepository.findByOrder(o);
+                    List<OrderItem> items = orderItemDao.findByOrder(o);
                     List<OrderItemVO> itemVOs = items.stream()
                             .map(this::toOrderItemVO)
                             .collect(Collectors.toList());
@@ -357,8 +382,10 @@ public class OrderService {
         List<OptionVO> options = parseOptionSnapshot(item.getOptionSnapshot());
 
         return OrderItemVO.builder()
+                .productId(item.getProduct() != null ? item.getProduct().getId() : null)
                 .productName(item.getProductNameSnapshot())
                 .productImage(item.getProductImageSnapshot())
+                .optionSnapshot(item.getOptionSnapshot())
                 .quantity(item.getQuantity())
                 .unitPrice(item.getUnitPrice())
                 .subtotalAmount(item.getSubtotalAmount())
@@ -377,8 +404,8 @@ public class OrderService {
             );
             return optionList.stream()
                     .map(vo -> {
-                        OptionGroup group = optionGroupRepository.findById(vo.getGroupId()).orElse(null);
-                        OptionValue value = optionValueRepository.findById(vo.getOptionId()).orElse(null);
+                        OptionGroup group = optionGroupDao.findById(vo.getGroupId());
+                        OptionValue value = optionValueDao.findById(vo.getOptionId());
                         return OptionVO.builder()
                                 .groupId(vo.getGroupId())
                                 .groupName(group != null ? group.getGroupName() : "")

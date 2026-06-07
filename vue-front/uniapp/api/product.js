@@ -1,9 +1,9 @@
 import { get } from './request.js'
 
 export const getProductDisplay = () => {
-  return get('/api/product/display')
+  return get('/api_product_display.action')
 }
 
 export const getProductDetail = (id) => {
-  return get(`/api/product/${id}`)
+  return get(`/api_product_detail.action?id=${id}`)
 }

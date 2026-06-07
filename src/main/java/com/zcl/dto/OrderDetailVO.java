@@ -20,6 +20,8 @@ public class OrderDetailVO {
     private Integer orderStatus;
     private Integer paymentStatus;
     private BigDecimal payAmount;
+    private String diningType;
+    private String tableNumber;
     private String remark;
     private LocalDateTime createdAt;
     private List<OrderItemVO> items;

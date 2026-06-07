@@ -1,15 +1,16 @@
 package com.zcl.service;
 
+import com.zcl.dao.OrderDao;
+import com.zcl.dao.OrderItemDao;
+import com.zcl.dao.ProductDao;
+import com.zcl.dao.UserDao;
 import com.zcl.dto.AdminDashboardVO;
 import com.zcl.dto.SalesStatsVO;
 import com.zcl.dto.TopProductVO;
 import com.zcl.entity.Orders;
-import com.zcl.repository.OrderItemRepository;
-import com.zcl.repository.OrderRepository;
-import com.zcl.repository.ProductRepository;
-import com.zcl.repository.UserRepository;
-import org.springframework.data.domain.PageRequest;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -22,33 +23,33 @@ import java.util.List;
 import java.util.Map;
 
 @Service
+@Transactional(readOnly = true)
 public class AdminDashboardService {
 
-    private final UserRepository userRepository;
-    private final OrderRepository orderRepository;
-    private final ProductRepository productRepository;
-    private final OrderItemRepository orderItemRepository;
+    @Autowired
+    private UserDao userDao;
 
-    public AdminDashboardService(UserRepository userRepository, OrderRepository orderRepository,
-                                  ProductRepository productRepository, OrderItemRepository orderItemRepository) {
-        this.userRepository = userRepository;
-        this.orderRepository = orderRepository;
-        this.productRepository = productRepository;
-        this.orderItemRepository = orderItemRepository;
-    }
+    @Autowired
+    private OrderDao orderDao;
+
+    @Autowired
+    private ProductDao productDao;
+
+    @Autowired
+    private OrderItemDao orderItemDao;
 
     public AdminDashboardVO getDashboardStats() {
         LocalDateTime todayStart = LocalDateTime.of(LocalDate.now(), LocalTime.MIN);
         LocalDateTime todayEnd = LocalDateTime.of(LocalDate.now(), LocalTime.MAX);
 
         return AdminDashboardVO.builder()
-                .totalUsers(userRepository.count())
-                .totalOrders(orderRepository.count())
-                .totalRevenue(orderRepository.sumTotalRevenue())
-                .todayOrders(orderRepository.countBetween(todayStart, todayEnd))
-                .todayRevenue(orderRepository.sumRevenueBetween(todayStart, todayEnd))
-                .pendingOrders(orderRepository.countByOrderStatus(0))
-                .productCount(productRepository.count())
+                .totalUsers(userDao.count())
+                .totalOrders(orderDao.count())
+                .totalRevenue(orderDao.sumTotalRevenue())
+                .todayOrders(orderDao.countBetween(todayStart, todayEnd))
+                .todayRevenue(orderDao.sumRevenueBetween(todayStart, todayEnd))
+                .pendingOrders(orderDao.countByOrderStatus(0))
+                .productCount(productDao.count())
                 .build();
     }
 
@@ -75,7 +76,7 @@ public class AdminDashboardService {
         LocalDateTime start = LocalDateTime.of(startDate, LocalTime.MIN);
         LocalDateTime end = LocalDateTime.of(endDate, LocalTime.MAX);
 
-        List<Orders> paidOrders = orderRepository.findPaidOrdersBetween(start, end);
+        List<Orders> paidOrders = orderDao.findPaidOrdersBetween(start, end);
 
         // 按日期分组统计
         Map<String, SalesStatsVO> statsMap = new HashMap<>();
@@ -124,7 +125,7 @@ public class AdminDashboardService {
     }
 
     public List<TopProductVO> getTopProducts(int limit) {
-        List<Object[]> rows = orderItemRepository.findTopProducts(PageRequest.of(0, limit));
+        List<Object[]> rows = orderItemDao.findTopProducts(limit);
         List<TopProductVO> result = new ArrayList<>();
         for (Object[] row : rows) {
             result.add(TopProductVO.builder()
@@ -138,7 +139,7 @@ public class AdminDashboardService {
     }
 
     public Map<Integer, Long> getOrderStatusDistribution() {
-        List<Object[]> rows = orderRepository.countGroupByStatus();
+        List<Object[]> rows = orderDao.countGroupByStatus();
         Map<Integer, Long> distribution = new HashMap<>();
         for (Object[] row : rows) {
             distribution.put((Integer) row[0], (Long) row[1]);

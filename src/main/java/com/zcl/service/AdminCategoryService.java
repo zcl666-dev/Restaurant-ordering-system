@@ -1,27 +1,27 @@
 package com.zcl.service;
 
+import com.zcl.dao.ProductCategoryDao;
+import com.zcl.dao.ProductDao;
 import com.zcl.dto.CategoryCreateRequest;
 import com.zcl.entity.ProductCategory;
-import com.zcl.repository.ProductCategoryRepository;
-import com.zcl.repository.ProductRepository;
-import org.springframework.data.domain.Sort;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
 @Service
+@Transactional
 public class AdminCategoryService {
 
-    private final ProductCategoryRepository categoryRepository;
-    private final ProductRepository productRepository;
+    @Autowired
+    private ProductCategoryDao categoryDao;
 
-    public AdminCategoryService(ProductCategoryRepository categoryRepository, ProductRepository productRepository) {
-        this.categoryRepository = categoryRepository;
-        this.productRepository = productRepository;
-    }
+    @Autowired
+    private ProductDao productDao;
 
     public List<ProductCategory> getCategoryList() {
-        return categoryRepository.findAll(Sort.by(Sort.Direction.ASC, "sortOrder"));
+        return categoryDao.findAllOrderBySortOrder();
     }
 
     public ProductCategory createCategory(CategoryCreateRequest request) {
@@ -30,26 +30,32 @@ public class AdminCategoryService {
         category.setIcon(request.getIcon());
         category.setSortOrder(request.getSortOrder() != null ? request.getSortOrder() : 0);
         category.setStatus(request.getStatus() != null ? request.getStatus() : 1);
-        return categoryRepository.save(category);
+        categoryDao.save(category);
+        return category;
     }
 
     public ProductCategory updateCategory(Long id, CategoryCreateRequest request) {
-        ProductCategory category = categoryRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("分类不存在"));
+        ProductCategory category = categoryDao.findById(id);
+        if (category == null) {
+            throw new RuntimeException("分类不存在");
+        }
         if (request.getCategoryName() != null) category.setCategoryName(request.getCategoryName());
         if (request.getIcon() != null) category.setIcon(request.getIcon());
         if (request.getSortOrder() != null) category.setSortOrder(request.getSortOrder());
         if (request.getStatus() != null) category.setStatus(request.getStatus());
-        return categoryRepository.save(category);
+        categoryDao.save(category);
+        return category;
     }
 
     public void deleteCategory(Long id) {
-        ProductCategory category = categoryRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("分类不存在"));
-        long productCount = productRepository.countByCategoryId(id);
+        ProductCategory category = categoryDao.findById(id);
+        if (category == null) {
+            throw new RuntimeException("分类不存在");
+        }
+        long productCount = productDao.countByCategoryId(id);
         if (productCount > 0) {
             throw new RuntimeException("该分类下还有 " + productCount + " 个商品，无法删除");
         }
-        categoryRepository.delete(category);
+        categoryDao.delete(category);
     }
 }

@@ -1,5 +1,5 @@
 import { get } from './request.js'
 
 export const getPointsDetail = () => {
-  return get('/api/points/detail')
+  return get('/api_points_detail.action')
 }

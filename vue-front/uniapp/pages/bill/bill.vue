@@ -23,14 +23,15 @@
         v-for="order in orderList"
         :key="order.id"
         class="order-card"
+        @tap="goDetail(order.id)"
       >
         <!-- 卡片头部：自取标签 + 门店名 + 状态 -->
         <view class="card-header">
           <view class="header-left">
             <view class="dining-badge">
-              <text class="dining-badge-text">{{ order.diningType === '外带' ? '外带' : '自取' }}</text>
+              <text class="dining-badge-text">{{ order.diningType === '2' ? '打包' : '堂食' }}</text>
             </view>
-            <text class="store-name">谷膳闽味台湾卤肉饭（火炬店）</text>
+            <text class="store-name">308商业帝国（财院店）</text>
           </view>
           <text class="order-status">{{ statusText(order.orderStatus) }}</text>
         </view>
@@ -48,10 +49,10 @@
           </view>
         </view>
 
-        <!-- 取餐号 -->
-        <view class="pickup-section" v-if="order.tableNumber">
-          <text class="pickup-label">取餐号：</text>
-          <text class="pickup-number">{{ order.tableNumber }}</text>
+        <!-- 座位号 -->
+        <view class="pickup-section">
+          <text class="pickup-label">座位号：</text>
+          <text class="pickup-number">{{ order.tableNumber || '0' }}</text>
         </view>
 
         <!-- 操作按钮 -->
@@ -78,7 +79,8 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
-import { getOrderList } from '@/api/order.js'
+import { getOrderList, getOrderDetail } from '@/api/order.js'
+import { addToCart } from '@/api/cart.js'
 
 const orderList = ref([])
 const isLoading = ref(true)
@@ -128,8 +130,28 @@ const goToOrder = () => {
   uni.switchTab({ url: '/pages/order/order' })
 }
 
-const reorder = (order) => {
-  uni.switchTab({ url: '/pages/order/order' })
+const reorder = async (order) => {
+  try {
+    const detail = await getOrderDetail(order.id)
+    const items = detail.items || []
+    if (items.length === 0) {
+      uni.showToast({ title: '订单无商品', icon: 'none' })
+      return
+    }
+    for (const item of items) {
+      await addToCart({
+        productId: item.productId,
+        quantity: item.quantity,
+        optionSnapshot: item.optionSnapshot || null
+      })
+    }
+    uni.showToast({ title: '已加入购物车', icon: 'success' })
+    setTimeout(() => {
+      uni.switchTab({ url: '/pages/order/order' })
+    }, 500)
+  } catch (err) {
+    uni.showToast({ title: err.message || '操作失败', icon: 'none' })
+  }
 }
 
 onMounted(() => {

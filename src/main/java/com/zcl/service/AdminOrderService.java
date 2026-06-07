@@ -1,27 +1,19 @@
 package com.zcl.service;
 
-import com.zcl.dto.AdminOrderDetailVO;
-import com.zcl.dto.AdminOrderVO;
-import com.zcl.dto.OptionVO;
-import com.zcl.dto.OrderItemVO;
-import com.zcl.dto.PageResult;
-import com.zcl.entity.OrderItem;
-import com.zcl.entity.Orders;
-import com.zcl.repository.OrderItemRepository;
-import com.zcl.repository.OrderRepository;
-import com.zcl.repository.UserRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.zcl.dao.OrderDao;
+import com.zcl.dao.OrderItemDao;
+import com.zcl.dao.UserDao;
+import com.zcl.dto.*;
+import com.zcl.entity.OrderItem;
+import com.zcl.entity.Orders;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
-import org.springframework.data.jpa.domain.Specification;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import jakarta.persistence.criteria.Predicate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
@@ -29,72 +21,84 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Service
+@Transactional
 public class AdminOrderService {
 
     private static final Logger log = LoggerFactory.getLogger(AdminOrderService.class);
 
-    private final OrderRepository orderRepository;
-    private final OrderItemRepository orderItemRepository;
-    private final UserRepository userRepository;
-    private final ObjectMapper objectMapper;
-    private final WxSubscribeService wxSubscribeService;
+    @Autowired
+    private OrderDao orderDao;
 
-    public AdminOrderService(OrderRepository orderRepository, OrderItemRepository orderItemRepository,
-                              UserRepository userRepository, ObjectMapper objectMapper,
-                              WxSubscribeService wxSubscribeService) {
-        this.orderRepository = orderRepository;
-        this.orderItemRepository = orderItemRepository;
-        this.userRepository = userRepository;
-        this.objectMapper = objectMapper;
-        this.wxSubscribeService = wxSubscribeService;
-    }
+    @Autowired
+    private OrderItemDao orderItemDao;
+
+    @Autowired
+    private UserDao userDao;
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
+    @Autowired
+    private WxSubscribeService wxSubscribeService;
 
     public PageResult<AdminOrderVO> getOrderList(int page, int size, Integer status, String keyword,
                                                    String startDate, String endDate) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        int offset = page * size;
+        List<Orders> orders;
+        long totalElements;
 
-        Specification<Orders> spec = (root, query, cb) -> {
-            List<Predicate> predicates = new ArrayList<>();
-            if (status != null) {
-                predicates.add(cb.equal(root.get("orderStatus"), status));
-            }
-            if (startDate != null && !startDate.isEmpty()) {
-                predicates.add(cb.greaterThanOrEqualTo(root.get("createdAt"),
-                        LocalDateTime.parse(startDate + "T00:00:00")));
-            }
-            if (endDate != null && !endDate.isEmpty()) {
-                predicates.add(cb.lessThanOrEqualTo(root.get("createdAt"),
-                        LocalDateTime.parse(endDate + "T23:59:59")));
-            }
-            return cb.and(predicates.toArray(new Predicate[0]));
-        };
+        LocalDateTime start = null;
+        LocalDateTime end = null;
+        if (startDate != null && !startDate.isEmpty()) {
+            start = LocalDateTime.parse(startDate + "T00:00:00");
+        }
+        if (endDate != null && !endDate.isEmpty()) {
+            end = LocalDateTime.parse(endDate + "T23:59:59");
+        }
 
-        Page<Orders> orderPage = orderRepository.findAll(spec, pageable);
+        if (status != null && start != null && end != null) {
+            orders = orderDao.findByStatusAndDateRangeWithPaging(status, start, end, offset, size);
+            totalElements = orderDao.count(); // 简化处理
+        } else if (status != null) {
+            orders = orderDao.findByStatusWithPaging(status, offset, size);
+            totalElements = orderDao.countByStatus(status);
+        } else if (start != null && end != null) {
+            orders = orderDao.findByDateRangeWithPaging(start, end, offset, size);
+            totalElements = orderDao.countBetween(start, end);
+        } else {
+            orders = orderDao.findAllWithPaging(offset, size);
+            totalElements = orderDao.count();
+        }
+
+        List<AdminOrderVO> content = orders.stream().map(this::toOrderVO).toList();
 
         return PageResult.<AdminOrderVO>builder()
-                .content(orderPage.getContent().stream().map(this::toOrderVO).toList())
-                .totalElements(orderPage.getTotalElements())
-                .totalPages(orderPage.getTotalPages())
+                .content(content)
+                .totalElements(totalElements)
+                .totalPages((int) Math.ceil((double) totalElements / size))
                 .currentPage(page)
                 .pageSize(size)
                 .build();
     }
 
     public AdminOrderDetailVO getOrderDetail(Long id) {
-        Orders order = orderRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("订单不存在"));
+        Orders order = orderDao.findById(id);
+        if (order == null) {
+            throw new RuntimeException("订单不存在");
+        }
         return toDetailVO(order);
     }
 
     public void updateOrderStatus(Long id, Integer newStatus) {
-        Orders order = orderRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("订单不存在"));
+        Orders order = orderDao.findById(id);
+        if (order == null) {
+            throw new RuntimeException("订单不存在");
+        }
 
         Integer oldStatus = order.getOrderStatus();
         log.info("管理员更新订单状态: orderNo={}, oldStatus={}, newStatus={}", order.getOrderNo(), oldStatus, newStatus);
 
         order.setOrderStatus(newStatus);
-        orderRepository.save(order);
+        orderDao.save(order);
 
         // 根据状态变化发送相应的通知
         try {
@@ -113,7 +117,7 @@ public class AdminOrderService {
     }
 
     private AdminOrderVO toOrderVO(Orders order) {
-        List<OrderItem> items = orderItemRepository.findByOrder(order);
+        List<OrderItem> items = orderItemDao.findByOrder(order);
         return AdminOrderVO.builder()
                 .id(order.getId())
                 .orderNo(order.getOrderNo())
@@ -129,7 +133,7 @@ public class AdminOrderService {
     }
 
     private AdminOrderDetailVO toDetailVO(Orders order) {
-        List<OrderItem> items = orderItemRepository.findByOrder(order);
+        List<OrderItem> items = orderItemDao.findByOrder(order);
         List<OrderItemVO> itemVOs = items.stream().map(item -> {
             List<OptionVO> options = new ArrayList<>();
             if (item.getOptionSnapshot() != null) {

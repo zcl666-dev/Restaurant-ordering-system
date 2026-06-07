@@ -1,0 +1,231 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE struts PUBLIC
+    "-//Apache Software Foundation//DTD Struts Configuration 2.5//EN"
+    "http://struts.apache.org/dtds/struts-2.5.dtd">
+
+<struts>
+    <constant name="struts.devMode" value="true"/>
+    <constant name="struts.objectFactory" value="spring"/>
+    <constant name="struts.enable.DynamicMethodInvocation" value="true"/>
+    <constant name="struts.mapper.alwaysSelectFullNamespace" value="false"/>
+
+    <!-- 拦截器定义 -->
+    <package name="default" extends="struts-default" namespace="/">
+
+        <interceptors>
+            <interceptor name="loginInterceptor" class="com.zcl.interceptor.LoginInterceptor"/>
+            <interceptor name="adminInterceptor" class="com.zcl.interceptor.AdminInterceptor"/>
+
+            <!-- 用户登录拦截器栈（排除登录接口） -->
+            <interceptor-stack name="userStack">
+                <interceptor-ref name="defaultStack"/>
+                <interceptor-ref name="loginInterceptor"/>
+            </interceptor-stack>
+
+            <!-- 管理员拦截器栈 -->
+            <interceptor-stack name="adminStack">
+                <interceptor-ref name="defaultStack"/>
+                <interceptor-ref name="adminInterceptor"/>
+            </interceptor-stack>
+        </interceptors>
+
+        <!-- ========== 默认 Action（根路径返回欢迎页） ========== -->
+        <action name="index">
+            <result name="success" type="redirect">/index.html</result>
+        </action>
+
+        <!-- ========== 用户端接口（需要用户登录） ========== -->
+        <action name="api_wx_login" class="com.zcl.action.WxLoginAction" method="login">
+        </action>
+
+        <action name="api_user_info" class="com.zcl.action.UserInfoAction" method="info">
+            <interceptor-ref name="userStack"/>
+        </action>
+
+        <action name="api_user_check_login" class="com.zcl.action.UserInfoAction" method="checkLogin">
+            <interceptor-ref name="userStack"/>
+        </action>
+
+        <action name="api_product_display" class="com.zcl.action.ProductAction" method="display">
+            <interceptor-ref name="userStack"/>
+        </action>
+
+        <action name="api_product_detail" class="com.zcl.action.ProductAction" method="detail">
+            <interceptor-ref name="userStack"/>
+        </action>
+
+        <action name="api_cart_add" class="com.zcl.action.CartAction" method="add">
+            <interceptor-ref name="userStack"/>
+        </action>
+
+        <action name="api_cart_current" class="com.zcl.action.CartAction" method="current">
+            <interceptor-ref name="userStack"/>
+        </action>
+
+        <action name="api_cart_item_update" class="com.zcl.action.CartAction" method="updateItem">
+            <interceptor-ref name="userStack"/>
+        </action>
+
+        <action name="api_order_create" class="com.zcl.action.OrderAction" method="create">
+            <interceptor-ref name="userStack"/>
+        </action>
+
+        <action name="api_order_detail" class="com.zcl.action.OrderAction" method="detail">
+            <interceptor-ref name="userStack"/>
+        </action>
+
+        <action name="api_order_cancel" class="com.zcl.action.OrderAction" method="cancel">
+            <interceptor-ref name="userStack"/>
+        </action>
+
+        <action name="api_order_pay" class="com.zcl.action.OrderAction" method="pay">
+            <interceptor-ref name="userStack"/>
+        </action>
+
+        <action name="api_order_complete" class="com.zcl.action.OrderAction" method="complete">
+            <interceptor-ref name="userStack"/>
+        </action>
+
+        <action name="api_order_update_dining_type" class="com.zcl.action.OrderAction" method="updateDiningType">
+            <interceptor-ref name="userStack"/>
+        </action>
+
+        <action name="api_order_list" class="com.zcl.action.OrderAction" method="list">
+            <interceptor-ref name="userStack"/>
+        </action>
+
+        <action name="api_points_detail" class="com.zcl.action.PointsAction" method="detail">
+            <interceptor-ref name="userStack"/>
+        </action>
+
+        <action name="api_subscribe_save" class="com.zcl.action.SubscribeAction" method="save">
+            <interceptor-ref name="userStack"/>
+        </action>
+
+        <!-- ========== 管理员接口（需要管理员登录） ========== -->
+        <action name="api_admin_login" class="com.zcl.action.AdminAuthAction" method="login">
+        </action>
+
+        <action name="api_admin_info" class="com.zcl.action.AdminAuthAction" method="info">
+            <interceptor-ref name="adminStack"/>
+        </action>
+
+        <action name="api_admin_dashboard_stats" class="com.zcl.action.AdminDashboardAction" method="stats">
+            <interceptor-ref name="adminStack"/>
+        </action>
+
+        <action name="api_admin_dashboard_sales" class="com.zcl.action.AdminDashboardAction" method="sales">
+            <interceptor-ref name="adminStack"/>
+        </action>
+
+        <action name="api_admin_dashboard_top_products" class="com.zcl.action.AdminDashboardAction" method="topProducts">
+            <interceptor-ref name="adminStack"/>
+        </action>
+
+        <action name="api_admin_dashboard_order_status" class="com.zcl.action.AdminDashboardAction" method="orderStatus">
+            <interceptor-ref name="adminStack"/>
+        </action>
+
+        <action name="api_admin_users" class="com.zcl.action.AdminUserAction" method="list">
+            <interceptor-ref name="adminStack"/>
+        </action>
+
+        <action name="api_admin_user_detail" class="com.zcl.action.AdminUserAction" method="detail">
+            <interceptor-ref name="adminStack"/>
+        </action>
+
+        <action name="api_admin_user_update" class="com.zcl.action.AdminUserAction" method="update">
+            <interceptor-ref name="adminStack"/>
+        </action>
+
+        <action name="api_admin_user_delete" class="com.zcl.action.AdminUserAction" method="delete">
+            <interceptor-ref name="adminStack"/>
+        </action>
+
+        <action name="api_admin_categories" class="com.zcl.action.AdminCategoryAction" method="list">
+            <interceptor-ref name="adminStack"/>
+        </action>
+
+        <action name="api_admin_category_create" class="com.zcl.action.AdminCategoryAction" method="create">
+            <interceptor-ref name="adminStack"/>
+        </action>
+
+        <action name="api_admin_category_update" class="com.zcl.action.AdminCategoryAction" method="update">
+            <interceptor-ref name="adminStack"/>
+        </action>
+
+        <action name="api_admin_category_delete" class="com.zcl.action.AdminCategoryAction" method="delete">
+            <interceptor-ref name="adminStack"/>
+        </action>
+
+        <action name="api_admin_products" class="com.zcl.action.AdminProductAction" method="list">
+            <interceptor-ref name="adminStack"/>
+        </action>
+
+        <action name="api_admin_product_detail" class="com.zcl.action.AdminProductAction" method="detail">
+            <interceptor-ref name="adminStack"/>
+        </action>
+
+        <action name="api_admin_product_create" class="com.zcl.action.AdminProductAction" method="create">
+            <interceptor-ref name="adminStack"/>
+        </action>
+
+        <action name="api_admin_product_update" class="com.zcl.action.AdminProductAction" method="update">
+            <interceptor-ref name="adminStack"/>
+        </action>
+
+        <action name="api_admin_product_delete" class="com.zcl.action.AdminProductAction" method="delete">
+            <interceptor-ref name="adminStack"/>
+        </action>
+
+        <action name="api_admin_product_status" class="com.zcl.action.AdminProductAction" method="toggleStatus">
+            <interceptor-ref name="adminStack"/>
+        </action>
+
+        <action name="api_admin_orders" class="com.zcl.action.AdminOrderAction" method="list">
+            <interceptor-ref name="adminStack"/>
+        </action>
+
+        <action name="api_admin_order_detail" class="com.zcl.action.AdminOrderAction" method="detail">
+            <interceptor-ref name="adminStack"/>
+        </action>
+
+        <action name="api_admin_order_status" class="com.zcl.action.AdminOrderAction" method="updateStatus">
+            <interceptor-ref name="adminStack"/>
+        </action>
+
+        <!-- ========== 桌台管理接口 ========== -->
+        <action name="api_admin_tables" class="com.zcl.action.DiningTableAction" method="list">
+            <interceptor-ref name="adminStack"/>
+        </action>
+
+        <action name="api_admin_table_detail" class="com.zcl.action.DiningTableAction" method="detail">
+            <interceptor-ref name="adminStack"/>
+        </action>
+
+        <action name="api_admin_table_add" class="com.zcl.action.DiningTableAction" method="add">
+            <interceptor-ref name="adminStack"/>
+        </action>
+
+        <action name="api_admin_table_update" class="com.zcl.action.DiningTableAction" method="update">
+            <interceptor-ref name="adminStack"/>
+        </action>
+
+        <action name="api_admin_table_delete" class="com.zcl.action.DiningTableAction" method="delete">
+            <interceptor-ref name="adminStack"/>
+        </action>
+
+        <action name="api_admin_table_generate_qr" class="com.zcl.action.DiningTableAction" method="generateQr">
+            <interceptor-ref name="adminStack"/>
+        </action>
+
+        <action name="api_admin_table_generate_all_qr" class="com.zcl.action.DiningTableAction" method="generateAllQr">
+            <interceptor-ref name="adminStack"/>
+        </action>
+
+        <action name="api_admin_table_download_qr" class="com.zcl.action.DiningTableAction" method="downloadQr">
+            <interceptor-ref name="adminStack"/>
+        </action>
+
+    </package>
+</struts>

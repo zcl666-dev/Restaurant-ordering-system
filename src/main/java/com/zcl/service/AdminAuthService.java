@@ -1,41 +1,44 @@
 package com.zcl.service;
 
+import com.zcl.dao.AdminDao;
 import com.zcl.dto.AdminLoginRequest;
 import com.zcl.dto.AdminLoginResponse;
 import com.zcl.entity.Admin;
-import com.zcl.repository.AdminRepository;
 import com.zcl.util.JwtUtil;
-import org.mindrot.jbcrypt.BCrypt;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 
 @Service
+@Transactional
 public class AdminAuthService {
 
-    private final AdminRepository adminRepository;
-    private final JwtUtil jwtUtil;
+    @Autowired
+    private AdminDao adminDao;
 
-    public AdminAuthService(AdminRepository adminRepository, JwtUtil jwtUtil) {
-        this.adminRepository = adminRepository;
-        this.jwtUtil = jwtUtil;
-    }
+    @Autowired
+    private JwtUtil jwtUtil;
 
     public AdminLoginResponse login(AdminLoginRequest request) {
-        Admin admin = adminRepository.findByUsername(request.getUsername())
-                .orElseThrow(() -> new RuntimeException("用户名或密码错误"));
+        Admin admin = adminDao.findByUsername(request.getUsername());
+        if (admin == null) {
+            throw new RuntimeException("用户名或密码错误");
+        }
 
         if (admin.getStatus() != 1) {
             throw new RuntimeException("账号已被禁用");
         }
 
-        if (!BCrypt.checkpw(request.getPassword(), admin.getPassword())) {
+        // 直接比较明文密码
+        if (!request.getPassword().equals(admin.getPassword())) {
             throw new RuntimeException("用户名或密码错误");
         }
 
         // 更新最后登录时间
         admin.setLastLoginTime(LocalDateTime.now());
-        adminRepository.save(admin);
+        adminDao.save(admin);
 
         String token = jwtUtil.generateAdminToken(admin.getId(), admin.getUsername(), admin.getRole());
 
@@ -48,7 +51,10 @@ public class AdminAuthService {
     }
 
     public Admin getAdminById(Long adminId) {
-        return adminRepository.findById(adminId)
-                .orElseThrow(() -> new RuntimeException("管理员不存在"));
+        Admin admin = adminDao.findById(adminId);
+        if (admin == null) {
+            throw new RuntimeException("管理员不存在");
+        }
+        return admin;
     }
 }

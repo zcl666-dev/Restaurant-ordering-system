@@ -66,6 +66,12 @@ const routes = [
         name: 'SalesStats',
         component: () => import('../views/stats/SalesStatsView.vue'),
         meta: { title: '销售统计' }
+      },
+      {
+        path: 'dining-tables',
+        name: 'DiningTable',
+        component: () => import('../views/dining-table/DiningTableView.vue'),
+        meta: { title: '桌台管理' }
       }
     ]
   }

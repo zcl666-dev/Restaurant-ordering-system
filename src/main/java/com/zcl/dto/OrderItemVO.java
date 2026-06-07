@@ -14,10 +14,12 @@ import java.util.List;
 @AllArgsConstructor
 public class OrderItemVO {
 
+    private Long productId;
     private String productName;
     private String productImage;
     private Integer quantity;
     private BigDecimal unitPrice;
     private BigDecimal subtotalAmount;
+    private String optionSnapshot;
     private List<OptionVO> options;
 }

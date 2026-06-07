@@ -31,6 +31,13 @@ mvnw.cmd
 .DS_Store
 Thumbs.db
 desktop.ini
+*.stackdump
+
+# === 上传文件 ===
+upload/
+
+# === 临时文件 ===
+Screenshot_*
 
 # === Spring Boot (secrets) ===
 src/main/resources/application.properties

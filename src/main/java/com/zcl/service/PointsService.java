@@ -1,42 +1,42 @@
 package com.zcl.service;
 
+import com.zcl.dao.PointLogDao;
+import com.zcl.dao.UserDao;
 import com.zcl.dto.PointLogVO;
 import com.zcl.dto.PointsDetailVO;
 import com.zcl.entity.PointLog;
 import com.zcl.entity.User;
-import com.zcl.repository.PointLogRepository;
-import com.zcl.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 @Service
+@Transactional(readOnly = true)
 public class PointsService {
 
     @Autowired
-    private PointLogRepository pointLogRepository;
+    private PointLogDao pointLogDao;
 
     @Autowired
-    private UserRepository userRepository;
+    private UserDao userDao;
 
-    @Autowired
-    private UserInfoService userInfoService;
-
-    public PointsDetailVO getPointsDetail() {
-        Long userId = userInfoService.getCurrentUserId();
+    public PointsDetailVO getPointsDetail(Long userId) {
         if (userId == null) {
             throw new RuntimeException("用户未登录");
         }
 
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("用户不存在"));
+        User user = userDao.findById(userId);
+        if (user == null) {
+            throw new RuntimeException("用户不存在");
+        }
 
-        List<PointLog> logs = pointLogRepository.findByUserOrderByCreatedAtDesc(user);
+        List<PointLog> logs = pointLogDao.findByUserId(userId);
 
         // 按月分组
         Map<String, List<PointLogVO>> grouped = new LinkedHashMap<>();
@@ -51,7 +51,7 @@ public class PointsService {
                     .orderNo(log.getOrder() != null ? log.getOrder().getOrderNo() : "")
                     .createdAt(log.getCreatedAt())
                     .build();
-            grouped.computeIfAbsent(monthKey, k -> new java.util.ArrayList<>()).add(vo);
+            grouped.computeIfAbsent(monthKey, k -> new ArrayList<>()).add(vo);
         }
 
         return PointsDetailVO.builder()

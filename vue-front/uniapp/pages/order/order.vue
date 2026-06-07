@@ -290,7 +290,15 @@ const handleScroll = (data) => {
 
 const handleCheckout = async () => {
   try {
-    const res = await createOrder()
+    // 从存储中获取桌号
+    const tableNo = uni.getStorageSync('tableNo')
+    const orderData = {}
+    if (tableNo) {
+      orderData.tableNumber = tableNo
+      // 堂食时自动设置用餐方式为堂食
+      orderData.diningType = 1
+    }
+    const res = await createOrder(orderData)
     pendingOrderId = res.orderId
 
     // 检查用户是否已经勾选了"总是保持以上选择"
@@ -465,6 +473,27 @@ onShow(() => {
   padding-bottom: 120rpx;
 }
 
+.dining-type-selector {
+  display: flex;
+  background-color: rgba(255, 255, 255, 0.15);
+  border-radius: 30rpx;
+  padding: 4rpx;
+}
+
+.dining-option {
+  font-size: 24rpx;
+  color: rgba(255, 255, 255, 0.7);
+  padding: 10rpx 24rpx;
+  border-radius: 26rpx;
+  transition: all 0.2s ease;
+
+  &.active {
+    background: linear-gradient(135deg, #FF6B6B, #FF8E53);
+    color: #fff;
+    font-weight: 600;
+  }
+}
+
 /* 购物车底部栏 */
 .cart-bar {
   position: fixed;
@@ -523,6 +552,7 @@ onShow(() => {
 .cart-bar-right {
   display: flex;
   align-items: center;
+  gap: 16rpx;
 }
 
 .checkout-btn {
