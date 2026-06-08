@@ -31,16 +31,10 @@
           <el-icon><TrendCharts /></el-icon>
           <template #title>销售统计</template>
         </el-menu-item>
-        <el-sub-menu index="store">
-          <template #title>
-            <el-icon><Shop /></el-icon>
-            <span>门店管理</span>
-          </template>
-          <el-menu-item index="/dining-tables">
-            <el-icon><Grid /></el-icon>
-            <template #title>桌台管理</template>
-          </el-menu-item>
-        </el-sub-menu>
+        <el-menu-item index="/dining-tables">
+          <el-icon><Grid /></el-icon>
+          <template #title>桌台管理</template>
+        </el-menu-item>
       </el-menu>
     </el-aside>
 

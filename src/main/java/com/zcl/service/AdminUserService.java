@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional
@@ -30,7 +31,7 @@ public class AdminUserService {
             totalElements = userDao.count();
         }
 
-        List<AdminUserVO> content = users.stream().map(this::toVO).toList();
+        List<AdminUserVO> content = users.stream().map(this::toVO).collect(Collectors.toList());
 
         return PageResult.<AdminUserVO>builder()
                 .content(content)

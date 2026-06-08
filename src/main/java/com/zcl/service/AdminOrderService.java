@@ -19,6 +19,7 @@ import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional
@@ -69,7 +70,7 @@ public class AdminOrderService {
             totalElements = orderDao.count();
         }
 
-        List<AdminOrderVO> content = orders.stream().map(this::toOrderVO).toList();
+        List<AdminOrderVO> content = orders.stream().map(this::toOrderVO).collect(Collectors.toList());
 
         return PageResult.<AdminOrderVO>builder()
                 .content(content)
@@ -149,7 +150,7 @@ public class AdminOrderService {
                     .subtotalAmount(item.getSubtotalAmount())
                     .options(options)
                     .build();
-        }).toList();
+        }).collect(Collectors.toList());
 
         return AdminOrderDetailVO.builder()
                 .id(order.getId())
