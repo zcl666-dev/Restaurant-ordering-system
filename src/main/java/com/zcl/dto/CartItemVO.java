@@ -23,4 +23,5 @@ public class CartItemVO {
     private BigDecimal subtotalAmount;
     private List<OptionVO> options;
     private boolean invalid;
+    private Long voucherId; // 可用的兑换券ID
 }

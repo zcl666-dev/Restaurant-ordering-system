@@ -38,6 +38,20 @@ export default defineConfig({
       '/api_subscribe': {
         target: 'http://localhost:8080/restaurant_order_war_exploded',
         changeOrigin: true
+      },
+      // 代理文件上传接口
+      '/api': {
+        target: 'http://localhost:8080/restaurant_order_war_exploded',
+        changeOrigin: true
+      },
+      // 代理静态资源（二维码、上传文件）
+      '/qrcode': {
+        target: 'http://localhost:8080/restaurant_order_war_exploded',
+        changeOrigin: true
+      },
+      '/upload': {
+        target: 'http://localhost:8080/restaurant_order_war_exploded',
+        changeOrigin: true
       }
     }
   }

@@ -1,17 +1,24 @@
 package com.zcl.service;
 
+import com.zcl.dao.OptionGroupDao;
 import com.zcl.dao.ProductCategoryDao;
 import com.zcl.dao.ProductDao;
+import com.zcl.dao.ProductOptionRelationDao;
 import com.zcl.dto.AdminProductVO;
 import com.zcl.dto.PageResult;
 import com.zcl.dto.ProductCreateRequest;
+import com.zcl.entity.OptionGroup;
 import com.zcl.entity.Product;
 import com.zcl.entity.ProductCategory;
+import com.zcl.entity.ProductOptionRelation;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -23,6 +30,28 @@ public class AdminProductService {
 
     @Autowired
     private ProductCategoryDao categoryDao;
+
+    @Autowired
+    private OptionGroupDao optionGroupDao;
+
+    @Autowired
+    private ProductOptionRelationDao productOptionRelationDao;
+
+    /**
+     * 获取所有启用的规格组（简单 Map 列表，避免 Hibernate 懒加载问题）
+     */
+    public List<Map<String, Object>> getAllEnabledOptionGroups() {
+        List<OptionGroup> groups = optionGroupDao.findAll();
+        return groups.stream()
+                .filter(g -> g.getStatus() != null && g.getStatus() == 1)
+                .map(g -> {
+                    Map<String, Object> map = new HashMap<>();
+                    map.put("id", g.getId());
+                    map.put("groupName", g.getGroupName());
+                    return map;
+                })
+                .collect(Collectors.toList());
+    }
 
     public PageResult<AdminProductVO> getProductList(int page, int size, Integer status, Long categoryId, String keyword) {
         int offset = page * size;
@@ -82,9 +111,14 @@ public class AdminProductService {
         product.setHasOptions(request.getHasOptions() != null ? request.getHasOptions() : 0);
         product.setIsRecommend(request.getIsRecommend() != null ? request.getIsRecommend() : 0);
         product.setIsHot(request.getIsHot() != null ? request.getIsHot() : 0);
+        product.setIsExchangeable(request.getIsExchangeable() != null ? request.getIsExchangeable() : 0);
         product.setStatus(request.getStatus() != null ? request.getStatus() : 1);
         product.setSalesCount(0);
         productDao.save(product);
+
+        // 保存规格组关联
+        saveOptionGroupRelations(product, request.getOptionGroupIds());
+
         return product;
     }
 
@@ -110,9 +144,16 @@ public class AdminProductService {
         if (request.getHasOptions() != null) product.setHasOptions(request.getHasOptions());
         if (request.getIsRecommend() != null) product.setIsRecommend(request.getIsRecommend());
         if (request.getIsHot() != null) product.setIsHot(request.getIsHot());
+        if (request.getIsExchangeable() != null) product.setIsExchangeable(request.getIsExchangeable());
         if (request.getStatus() != null) product.setStatus(request.getStatus());
 
         productDao.save(product);
+
+        // 更新规格组关联（如果传了 optionGroupIds 则替换，否则不动）
+        if (request.getOptionGroupIds() != null) {
+            saveOptionGroupRelations(product, request.getOptionGroupIds());
+        }
+
         return product;
     }
 
@@ -135,6 +176,15 @@ public class AdminProductService {
     }
 
     private AdminProductVO toVO(Product product) {
+        // 查询该商品关联的规格组 ID 列表
+        List<Long> optionGroupIds = new ArrayList<>();
+        if (product.getHasOptions() != null && product.getHasOptions() == 1) {
+            List<ProductOptionRelation> relations = productOptionRelationDao.findByProductId(product.getId());
+            optionGroupIds = relations.stream()
+                    .map(r -> r.getGroup().getId())
+                    .collect(Collectors.toList());
+        }
+
         return AdminProductVO.builder()
                 .id(product.getId())
                 .categoryId(product.getCategory().getId())
@@ -149,7 +199,35 @@ public class AdminProductService {
                 .hasOptions(product.getHasOptions())
                 .isRecommend(product.getIsRecommend())
                 .isHot(product.getIsHot())
+                .isExchangeable(product.getIsExchangeable())
                 .status(product.getStatus())
+                .optionGroupIds(optionGroupIds)
                 .build();
+    }
+
+    /**
+     * 保存商品与规格组的关联关系（先删后增）
+     */
+    private void saveOptionGroupRelations(Product product, List<Long> groupIds) {
+        if (groupIds == null) groupIds = new ArrayList<>();
+
+        // 删除旧关联
+        List<ProductOptionRelation> oldRelations = productOptionRelationDao.findByProductId(product.getId());
+        for (ProductOptionRelation old : oldRelations) {
+            productOptionRelationDao.delete(old);
+        }
+
+        // 创建新关联
+        for (int i = 0; i < groupIds.size(); i++) {
+            OptionGroup group = optionGroupDao.findById(groupIds.get(i));
+            if (group != null) {
+                ProductOptionRelation relation = new ProductOptionRelation();
+                relation.setProduct(product);
+                relation.setGroup(group);
+                relation.setSortOrder(i);
+                relation.setIsVisible(1);
+                productOptionRelationDao.save(relation);
+            }
+        }
     }
 }

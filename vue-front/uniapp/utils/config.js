@@ -1,5 +1,5 @@
 const config = {
-  baseURL: 'http://192.168.1.25:8080',
+  baseURL: 'http://10.13.99.3:8080/restaurant_order_war_exploded',
   timeout: 10000
 }
 

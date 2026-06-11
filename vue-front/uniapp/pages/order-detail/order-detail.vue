@@ -58,6 +58,14 @@
           <text class="section-title">金额明细</text>
         </view>
         <view class="summary-row">
+          <text class="summary-label">商品总计</text>
+          <text class="summary-value">¥{{ (orderData.totalAmount || orderData.payAmount).toFixed(2) }}</text>
+        </view>
+        <view class="summary-row" v-if="orderData.discountAmount > 0">
+          <text class="summary-label">兑换券抵扣</text>
+          <text class="summary-value discount">-¥{{ orderData.discountAmount.toFixed(2) }}</text>
+        </view>
+        <view class="summary-row summary-pay-row">
           <text class="summary-label">实付金额</text>
           <view class="summary-pay-wrapper">
             <text class="summary-pay-symbol">¥</text>
@@ -493,6 +501,15 @@ onLoad((options) => {
   font-size: 36rpx;
   font-weight: bold;
   color: #FF6B6B;
+}
+
+.summary-value.discount {
+  color: #67c23a;
+  font-weight: 600;
+}
+
+.summary-pay-row {
+  background-color: #fffaf7;
 }
 
 .dining-type-selector {

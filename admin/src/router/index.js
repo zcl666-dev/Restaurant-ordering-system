@@ -72,6 +72,18 @@ const routes = [
         name: 'DiningTable',
         component: () => import('../views/dining-table/DiningTableView.vue'),
         meta: { title: '桌台管理' }
+      },
+      {
+        path: 'point-logs',
+        name: 'PointLogs',
+        component: () => import('../views/points/PointsLogView.vue'),
+        meta: { title: '积分流水' }
+      },
+      {
+        path: 'points-mall',
+        name: 'PointsMall',
+        component: () => import('../views/points/PointsMallView.vue'),
+        meta: { title: '积分商城' }
       }
     ]
   }

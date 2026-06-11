@@ -23,7 +23,7 @@
           <text class="asset-emoji">🎁</text>
         </view>
         <text class="asset-label">兑换券</text>
-        <text class="asset-value">0张</text>
+        <text class="asset-value">{{ voucherCount }}张</text>
       </view>
       <view class="asset-divider"></view>
       <view class="asset-item asset-balance">
@@ -71,6 +71,9 @@
         </button>
       </view>
     </view>
+
+    <!-- 自定义 TabBar -->
+    <TabBar />
   </view>
 </template>
 
@@ -78,6 +81,8 @@
 import { ref, reactive } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { getUserInfo } from '@/api/user.js'
+import { getVoucherList } from '@/api/points.js'
+import TabBar from '@/components/TabBar/TabBar.vue'
 
 const userInfo = reactive({
   nickName: '',
@@ -85,6 +90,8 @@ const userInfo = reactive({
   balance: 0,
   pointsBalance: 0
 })
+
+const voucherCount = ref(0)
 
 const fetchUserInfo = async () => {
   try {
@@ -102,6 +109,15 @@ const fetchUserInfo = async () => {
   }
 }
 
+const fetchVoucherCount = async () => {
+  try {
+    const data = await getVoucherList()
+    voucherCount.value = data.unusedCount || 0
+  } catch (err) {
+    console.error('获取兑换券数量失败:', err)
+  }
+}
+
 const goOrder = () => {
   uni.switchTab({ url: '/pages/bill/bill' })
 }
@@ -111,7 +127,7 @@ const goProfile = () => {
 }
 
 const goVoucher = () => {
-  uni.showToast({ title: '兑换券开发中', icon: 'none' })
+  uni.navigateTo({ url: '/pages/voucher/voucher' })
 }
 
 const goPoints = () => {
@@ -119,11 +135,12 @@ const goPoints = () => {
 }
 
 const goVoucherExchange = () => {
-  uni.showToast({ title: '兑换券兑换开发中', icon: 'none' })
+  uni.navigateTo({ url: '/pages/points-exchange/points-exchange' })
 }
 
 onShow(() => {
   fetchUserInfo()
+  fetchVoucherCount()
 })
 </script>
 
@@ -131,6 +148,7 @@ onShow(() => {
 .user-page {
   min-height: 100vh;
   background-color: #f5f5f5;
+  padding-bottom: calc(110rpx + env(safe-area-inset-bottom));
 }
 
 .header-bg {

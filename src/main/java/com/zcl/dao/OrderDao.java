@@ -129,4 +129,48 @@ public class OrderDao extends BaseDao<Orders, Long> {
                 .setParameter("userId", userId)
                 .list();
     }
+
+    /**
+     * 查询 id > lastId 的已支付新订单（用于轮询新订单提醒）
+     */
+    @SuppressWarnings("unchecked")
+    public List<Orders> findPaidOrdersAfterId(Long lastId) {
+        return getCurrentSession()
+                .createQuery("FROM Orders WHERE id > :lastId AND paymentStatus = 1 ORDER BY id ASC")
+                .setParameter("lastId", lastId)
+                .list();
+    }
+
+    /**
+     * 查询已支付订单中最大的 id（用于初始化 lastOrderId）
+     */
+    public Long findMaxPaidOrderId() {
+        Object result = getCurrentSession()
+                .createQuery("SELECT COALESCE(MAX(id), 0) FROM Orders WHERE paymentStatus = 1")
+                .uniqueResult();
+        return result instanceof Long ? (Long) result : ((Number) result).longValue();
+    }
+
+    /**
+     * 按关键词搜索（订单号或桌号模糊匹配）
+     */
+    @SuppressWarnings("unchecked")
+    public List<Orders> findByKeywordWithPaging(String keyword, int offset, int limit) {
+        return getCurrentSession()
+                .createQuery("FROM Orders WHERE orderNo LIKE :keyword OR tableNumber LIKE :keyword ORDER BY createdAt DESC")
+                .setParameter("keyword", "%" + keyword + "%")
+                .setFirstResult(offset)
+                .setMaxResults(limit)
+                .list();
+    }
+
+    /**
+     * 按关键词统计数量
+     */
+    public long countByKeyword(String keyword) {
+        return (long) getCurrentSession()
+                .createQuery("SELECT COUNT(*) FROM Orders WHERE orderNo LIKE :keyword OR tableNumber LIKE :keyword")
+                .setParameter("keyword", "%" + keyword + "%")
+                .uniqueResult();
+    }
 }

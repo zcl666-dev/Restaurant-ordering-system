@@ -38,6 +38,12 @@ public class PointsMall {
     @Column(name = "expire_days", nullable = false)
     private Integer expireDays = 7; // 兑换券有效天数
 
+    @Column(name = "exchange_quantity", nullable = false)
+    private Integer exchangeQuantity = 0; // 限制兑换数量，0表示不限量
+
+    @Column(name = "redeemed_count", nullable = false)
+    private Integer redeemedCount = 0; // 已兑换数量
+
     @Column(name = "status", nullable = false)
     private Integer status = 1; // 状态
 

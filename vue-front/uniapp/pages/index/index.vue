@@ -1,5 +1,19 @@
 <template>
   <view class="index-page">
+    <!-- 桌号提示栏 -->
+    <view class="table-bar" v-if="tableNo">
+      <view class="table-bar-inner">
+        <text class="table-icon">🪑</text>
+        <text class="table-text">当前桌号：<text class="table-no">{{ tableNo }}</text></text>
+      </view>
+    </view>
+    <view class="table-bar table-bar-hint" v-else>
+      <view class="table-bar-inner">
+        <text class="table-icon">📱</text>
+        <text class="table-text">请扫描桌台二维码或选择堂食/外带</text>
+      </view>
+    </view>
+
     <!-- 欢迎区域 -->
     <view class="welcome-section">
       <view class="welcome-text">
@@ -85,11 +99,16 @@
         <text class="recommend-hint-text">点击进入点餐页面，探索美味佳肴</text>
       </view>
     </view>
+
+    <!-- 自定义 TabBar -->
+    <TabBar />
   </view>
 </template>
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
+import { saveTableNo, getTableNo } from '../../utils/tableStorage.js'
+import TabBar from '@/components/TabBar/TabBar.vue'
 
 const images = reactive([
   { src: '/static/pic1.jpg', loaded: false, error: false },
@@ -98,6 +117,7 @@ const images = reactive([
 ])
 
 const currentIndex = ref(0)
+const tableNo = ref('')
 
 const greetingText = computed(() => {
   const hour = new Date().getHours()
@@ -108,36 +128,63 @@ const greetingText = computed(() => {
   return '晚上好 🌙'
 })
 
-// 页面加载时获取桌号参数
-onMounted(() => {
-  // #ifdef MP-WEIXIN
-  // 小程序环境下从页面参数获取桌号
-  const pages = getCurrentPages()
-  const currentPage = pages[pages.length - 1]
-  const options = currentPage?.options || {}
-  if (options.tableNo) {
-    uni.setStorageSync('tableNo', options.tableNo)
-    uni.showToast({
-      title: `已识别桌号: ${options.tableNo}`,
-      icon: 'success'
-    })
+/**
+ * 解析 scene 参数，提取桌号
+ * 微信小程序扫码进入时，scene 值格式为 "tableNo=A01"
+ */
+function parseScene(scene) {
+  if (!scene) return null
+  // scene 可能是 URL 编码的，先解码
+  const decoded = decodeURIComponent(scene)
+  // 支持 "tableNo=A01" 和直接 "A01" 两种格式
+  if (decoded.includes('tableNo=')) {
+    return decoded.split('tableNo=')[1]
   }
-  // #endif
-})
-
-// 页面显示时也检查参数（处理扫码进入场景）
-const onLoad = (options) => {
-  if (options && options.tableNo) {
-    uni.setStorageSync('tableNo', options.tableNo)
-    uni.showToast({
-      title: `已识别桌号: ${options.tableNo}`,
-      icon: 'success'
-    })
-  }
+  return decoded
 }
 
-// 导出onLoad供页面使用
-defineExpose({ onLoad })
+/**
+ * 页面加载生命周期（UniApp）
+ * 扫码进入时微信自动传入 options.scene
+ */
+onLoad((options) => {
+  console.log('[index] onLoad options:', JSON.stringify(options))
+
+  // 优先从 scene 参数获取桌号（扫码进入）
+  if (options && options.scene) {
+    const parsedTableNo = parseScene(options.scene)
+    if (parsedTableNo) {
+      tableNo.value = parsedTableNo
+      saveTableNo(parsedTableNo)
+      uni.showToast({ title: `已识别桌号: ${parsedTableNo}`, icon: 'success' })
+      return
+    }
+  }
+
+  // 其次从 options.tableNo 获取（直接页面跳转）
+  if (options && options.tableNo) {
+    tableNo.value = options.tableNo
+    saveTableNo(options.tableNo)
+    uni.showToast({ title: `已识别桌号: ${options.tableNo}`, icon: 'success' })
+    return
+  }
+
+  // 最后从本地存储读取（之前扫码保存过的）
+  const stored = getTableNo()
+  if (stored) {
+    tableNo.value = stored
+  }
+})
+
+onMounted(() => {
+  // 兜底：如果 onLoad 没拿到，再从存储读一次
+  if (!tableNo.value) {
+    const stored = getTableNo()
+    if (stored) {
+      tableNo.value = stored
+    }
+  }
+})
 
 const onSwiperChange = (e) => {
   currentIndex.value = e.detail.current
@@ -170,6 +217,38 @@ const goToUser = () => {
 .index-page {
   min-height: 100vh;
   background-color: #f5f5f5;
+  padding-bottom: calc(110rpx + env(safe-area-inset-bottom));
+}
+
+/* 桌号提示栏 */
+.table-bar {
+  background: linear-gradient(135deg, #07c160 0%, #06ad56 100%);
+  padding: 20rpx 32rpx;
+}
+
+.table-bar-hint {
+  background: linear-gradient(135deg, #909399 0%, #606266 100%);
+}
+
+.table-bar-inner {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.table-icon {
+  font-size: 32rpx;
+}
+
+.table-text {
+  font-size: 26rpx;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.table-no {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #fff;
 }
 
 /* 欢迎区域 */

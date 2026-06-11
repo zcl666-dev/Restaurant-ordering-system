@@ -17,9 +17,9 @@ export function updateProduct(id, data) {
 }
 
 export function deleteProduct(id) {
-  return request.post('/api_admin_product_delete.action', { id })
+  return request.post('/api_admin_product_delete.action', null, { params: { id } })
 }
 
 export function toggleProductStatus(id, status) {
-  return request.post('/api_admin_product_status.action', { id, status })
+  return request.post('/api_admin_product_status.action', null, { params: { id, status } })
 }

@@ -30,4 +30,9 @@ public class CartAddResponse {
      * 商品总金额
      */
     private BigDecimal totalAmount;
+
+    /**
+     * 兑换券抵扣金额
+     */
+    private BigDecimal voucherDiscount;
 }

@@ -92,7 +92,7 @@ const formatTime = (timeStr) => {
 }
 
 const handleExchange = () => {
-  uni.showToast({ title: '兑换功能开发中', icon: 'none' })
+  uni.navigateTo({ url: '/pages/points-exchange/points-exchange' })
 }
 
 onMounted(() => {

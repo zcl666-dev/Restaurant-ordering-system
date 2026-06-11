@@ -73,6 +73,9 @@
         </view>
       </view>
     </scroll-view>
+
+    <!-- 自定义 TabBar -->
+    <TabBar />
   </view>
 </template>
 
@@ -81,6 +84,7 @@ import { ref, onMounted } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { getOrderList, getOrderDetail } from '@/api/order.js'
 import { addToCart } from '@/api/cart.js'
+import TabBar from '@/components/TabBar/TabBar.vue'
 
 const orderList = ref([])
 const isLoading = ref(true)
@@ -167,6 +171,7 @@ onShow(() => {
 .bill-page {
   min-height: 100vh;
   background-color: #f5f5f5;
+  padding-bottom: calc(110rpx + env(safe-area-inset-bottom));
 }
 
 /* 页面头部 */

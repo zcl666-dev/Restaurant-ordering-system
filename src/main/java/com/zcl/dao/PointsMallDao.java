@@ -15,4 +15,17 @@ public class PointsMallDao extends BaseDao<PointsMall, Long> {
                 .setParameter("status", status)
                 .list();
     }
+
+    @SuppressWarnings("unchecked")
+    public List<PointsMall> findAllWithPaging(int offset, int limit) {
+        return getCurrentSession()
+                .createQuery("FROM PointsMall ORDER BY createdAt DESC")
+                .setFirstResult(offset)
+                .setMaxResults(limit)
+                .list();
+    }
+
+    public PointsMall findByProductId(Long productId) {
+        return findOneByHql("FROM PointsMall WHERE product.id = ?1", productId);
+    }
 }

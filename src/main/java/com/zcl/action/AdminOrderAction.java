@@ -17,6 +17,8 @@ import org.springframework.stereotype.Controller;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import java.util.List;
+import java.util.Map;
 
 @Controller
 @Scope("prototype")
@@ -36,6 +38,7 @@ public class AdminOrderAction extends ActionSupport {
     private String keyword;
     private String startDate;
     private String endDate;
+    private Long lastOrderId;
 
     private void writeJson(Result<?> result) {
         try {
@@ -79,6 +82,24 @@ public class AdminOrderAction extends ActionSupport {
         return NONE;
     }
 
+    public String checkNew() {
+        try {
+            if (lastOrderId == null) {
+                // 未传 lastOrderId 时，返回当前已支付订单最大 id（前端用于初始化）
+                Long maxId = adminOrderService.getMaxPaidOrderId();
+                writeJson(Result.success("获取成功", Map.of("lastOrderId", maxId, "newOrders", List.of())));
+            } else {
+                List<AdminOrderVO> newOrders = adminOrderService.getNewPaidOrders(lastOrderId);
+                Long newMaxId = newOrders.isEmpty() ? lastOrderId :
+                        newOrders.stream().mapToLong(AdminOrderVO::getId).max().orElse(lastOrderId);
+                writeJson(Result.success("获取成功", Map.of("lastOrderId", newMaxId, "newOrders", newOrders)));
+            }
+        } catch (Exception e) {
+            writeJson(Result.error(500, "检查新订单失败: " + e.getMessage()));
+        }
+        return NONE;
+    }
+
     // Getters and Setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -94,4 +115,6 @@ public class AdminOrderAction extends ActionSupport {
     public void setStartDate(String startDate) { this.startDate = startDate; }
     public String getEndDate() { return endDate; }
     public void setEndDate(String endDate) { this.endDate = endDate; }
+    public Long getLastOrderId() { return lastOrderId; }
+    public void setLastOrderId(Long lastOrderId) { this.lastOrderId = lastOrderId; }
 }

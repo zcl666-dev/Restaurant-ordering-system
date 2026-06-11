@@ -19,6 +19,8 @@ public class OrderDetailVO {
     private String orderNo;
     private Integer orderStatus;
     private Integer paymentStatus;
+    private BigDecimal totalAmount;
+    private BigDecimal discountAmount;
     private BigDecimal payAmount;
     private String diningType;
     private String tableNumber;

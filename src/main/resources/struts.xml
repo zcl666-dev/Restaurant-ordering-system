@@ -98,6 +98,18 @@
             <interceptor-ref name="userStack"/>
         </action>
 
+        <action name="api_points_mall_list" class="com.zcl.action.PointsAction" method="mallList">
+            <interceptor-ref name="userStack"/>
+        </action>
+
+        <action name="api_points_vouchers" class="com.zcl.action.PointsAction" method="voucherList">
+            <interceptor-ref name="userStack"/>
+        </action>
+
+        <action name="api_points_exchange" class="com.zcl.action.PointsAction" method="exchange">
+            <interceptor-ref name="userStack"/>
+        </action>
+
         <action name="api_subscribe_save" class="com.zcl.action.SubscribeAction" method="save">
             <interceptor-ref name="userStack"/>
         </action>
@@ -194,6 +206,10 @@
             <interceptor-ref name="adminStack"/>
         </action>
 
+        <action name="api_admin_orders_check_new" class="com.zcl.action.AdminOrderAction" method="checkNew">
+            <interceptor-ref name="adminStack"/>
+        </action>
+
         <!-- ========== 桌台管理接口 ========== -->
         <action name="api_admin_tables" class="com.zcl.action.DiningTableAction" method="list">
             <interceptor-ref name="adminStack"/>
@@ -224,6 +240,32 @@
         </action>
 
         <action name="api_admin_table_download_qr" class="com.zcl.action.DiningTableAction" method="downloadQr">
+            <interceptor-ref name="adminStack"/>
+        </action>
+
+        <!-- ========== 规格组管理接口 ========== -->
+        <action name="api_admin_option_groups" class="com.zcl.action.OptionGroupAction" method="list">
+            <interceptor-ref name="adminStack"/>
+        </action>
+
+        <!-- ========== 积分管理接口 ========== -->
+        <action name="api_admin_point_logs" class="com.zcl.action.AdminPointsAction" method="list">
+            <interceptor-ref name="adminStack"/>
+        </action>
+
+        <action name="api_admin_points_mall" class="com.zcl.action.AdminPointsAction" method="mallList">
+            <interceptor-ref name="adminStack"/>
+        </action>
+
+        <action name="api_admin_points_mall_create" class="com.zcl.action.AdminPointsAction" method="mallCreate">
+            <interceptor-ref name="adminStack"/>
+        </action>
+
+        <action name="api_admin_points_mall_update" class="com.zcl.action.AdminPointsAction" method="mallUpdate">
+            <interceptor-ref name="adminStack"/>
+        </action>
+
+        <action name="api_admin_points_mall_delete" class="com.zcl.action.AdminPointsAction" method="mallDelete">
             <interceptor-ref name="adminStack"/>
         </action>
 

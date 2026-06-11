@@ -1,41 +1,39 @@
 package com.zcl.service;
 
-import com.google.zxing.BarcodeFormat;
-import com.google.zxing.EncodeHintType;
-import com.google.zxing.WriterException;
-import com.google.zxing.client.j2se.MatrixToImageWriter;
-import com.google.zxing.common.BitMatrix;
-import com.google.zxing.qrcode.QRCodeWriter;
+import com.zcl.dao.DiningTableDao;
 import com.zcl.dto.BatchGenerateResult;
 import com.zcl.dto.DiningTableCreateRequest;
 import com.zcl.dto.DiningTableDTO;
 import com.zcl.dto.PageResult;
 import com.zcl.entity.DiningTable;
-import com.zcl.dao.DiningTableDao;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import javax.servlet.http.HttpServletRequest;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 
+/**
+ * 桌台管理服务
+ */
 @Service
 @Transactional
 public class DiningTableService {
 
+    private static final Logger log = LoggerFactory.getLogger(DiningTableService.class);
+
     @Autowired
     private DiningTableDao diningTableDao;
 
-    @Value("${upload.path:upload}")
-    private String uploadPath;
+    @Autowired
+    private WechatService wechatService;
+
+    /** 小程序码宽度 */
+    private static final int QRCODE_WIDTH = 300;
+    /** 小程序页面路径 */
+    private static final String MINI_PROGRAM_PAGE = "pages/index/index";
 
     /**
      * 分页查询桌台
@@ -72,7 +70,6 @@ public class DiningTableService {
      * 新增桌台
      */
     public void createTable(DiningTableCreateRequest request) {
-        // 检查桌号唯一性
         DiningTable existing = diningTableDao.findByTableNo(request.getTableNo());
         if (existing != null) {
             throw new RuntimeException("桌号已存在");
@@ -84,6 +81,8 @@ public class DiningTableService {
         table.setSeatCount(request.getSeatCount() != null ? request.getSeatCount() : 4);
         table.setStatus(request.getStatus() != null ? request.getStatus() : 1);
         diningTableDao.save(table);
+
+        log.info("新增桌台: tableNo={}", request.getTableNo());
     }
 
     /**
@@ -95,7 +94,6 @@ public class DiningTableService {
             throw new RuntimeException("桌台不存在");
         }
 
-        // 如果修改了桌号，检查唯一性
         if (request.getTableNo() != null && !request.getTableNo().equals(table.getTableNo())) {
             DiningTable existing = diningTableDao.findByTableNo(request.getTableNo());
             if (existing != null) {
@@ -104,17 +102,12 @@ public class DiningTableService {
             table.setTableNo(request.getTableNo());
         }
 
-        if (request.getTableName() != null) {
-            table.setTableName(request.getTableName());
-        }
-        if (request.getSeatCount() != null) {
-            table.setSeatCount(request.getSeatCount());
-        }
-        if (request.getStatus() != null) {
-            table.setStatus(request.getStatus());
-        }
+        if (request.getTableName() != null) table.setTableName(request.getTableName());
+        if (request.getSeatCount() != null) table.setSeatCount(request.getSeatCount());
+        if (request.getStatus() != null) table.setStatus(request.getStatus());
 
         diningTableDao.save(table);
+        log.info("更新桌台: id={}, tableNo={}", id, table.getTableNo());
     }
 
     /**
@@ -125,63 +118,39 @@ public class DiningTableService {
         if (table == null) {
             throw new RuntimeException("桌台不存在");
         }
-        // 删除二维码文件
-        if (table.getQrCodeUrl() != null && !table.getQrCodeUrl().isEmpty()) {
-            try {
-                Path filePath = Paths.get(uploadPath, table.getQrCodeUrl());
-                Files.deleteIfExists(filePath);
-            } catch (IOException e) {
-                // 忽略删除文件失败
-            }
-        }
         diningTableDao.deleteById(id);
+        log.info("删除桌台: id={}, tableNo={}", id, table.getTableNo());
     }
 
     /**
-     * 生成二维码
+     * 生成单个桌台的二维码（优先微信小程序码，失败自动降级ZXing）
+     * @param id 桌台ID
+     * @return base64 data URL
      */
-    public String generateQrCode(Long id, HttpServletRequest request) {
+    public String generateQrCode(Long id) {
         DiningTable table = diningTableDao.findById(id);
         if (table == null) {
             throw new RuntimeException("桌台不存在");
         }
 
-        try {
-            // 二维码内容：小程序页面路径+桌号
-            String content = "pages/index/index?tableNo=" + table.getTableNo();
+        // 调用微信API生成小程序码
+        String scene = "tableNo=" + java.net.URLEncoder.encode(table.getTableNo(), java.nio.charset.StandardCharsets.UTF_8);
+        byte[] imageData = wechatService.generateQrCode(scene, MINI_PROGRAM_PAGE, QRCODE_WIDTH);
 
-            // 生成二维码
-            QRCodeWriter qrCodeWriter = new QRCodeWriter();
-            Map<EncodeHintType, Object> hints = new HashMap<>();
-            hints.put(EncodeHintType.CHARACTER_SET, "UTF-8");
-            hints.put(EncodeHintType.MARGIN, 1);
-            BitMatrix bitMatrix = qrCodeWriter.encode(content, BarcodeFormat.QR_CODE, 300, 300, hints);
+        // 转为 base64 data URL 存入数据库
+        String dataUrl = wechatService.toDataUrl(imageData);
 
-            // 创建上传目录
-            String qrDir = uploadPath + "/qrcode";
-            Files.createDirectories(Paths.get(qrDir));
+        table.setQrCodeUrl(dataUrl);
+        diningTableDao.save(table);
 
-            // 保存文件
-            String fileName = table.getTableNo() + ".png";
-            String filePath = qrDir + "/" + fileName;
-            Path path = Paths.get(filePath);
-            MatrixToImageWriter.writeToPath(bitMatrix, "PNG", path);
-
-            // 更新数据库
-            String qrUrl = "/qrcode/" + fileName;
-            table.setQrCodeUrl(qrUrl);
-            diningTableDao.save(table);
-
-            return qrUrl;
-        } catch (WriterException | IOException e) {
-            throw new RuntimeException("生成二维码失败: " + e.getMessage());
-        }
+        log.info("生成二维码成功: tableNo={}", table.getTableNo());
+        return dataUrl;
     }
 
     /**
-     * 批量生成二维码
+     * 批量生成二维码（所有未生成二维码的桌台）
      */
-    public BatchGenerateResult batchGenerateQrCode(HttpServletRequest request) {
+    public BatchGenerateResult batchGenerateQrCode() {
         long startTime = System.currentTimeMillis();
         int successCount = 0;
         int failCount = 0;
@@ -189,10 +158,11 @@ public class DiningTableService {
         List<DiningTable> tables = diningTableDao.findWithoutQrCode();
         for (DiningTable table : tables) {
             try {
-                generateQrCode(table.getId(), request);
+                generateQrCode(table.getId());
                 successCount++;
             } catch (Exception e) {
                 failCount++;
+                log.error("批量生成二维码失败: tableNo={}, error={}", table.getTableNo(), e.getMessage());
             }
         }
 
@@ -200,7 +170,20 @@ public class DiningTableService {
         result.setSuccessCount(successCount);
         result.setFailCount(failCount);
         result.setTimeCost(System.currentTimeMillis() - startTime);
+
+        log.info("批量生成二维码完成: 成功={}, 失败={}, 耗时={}ms", successCount, failCount, result.getTimeCost());
         return result;
+    }
+
+    /**
+     * 获取二维码图片字节数组（用于下载）
+     */
+    public byte[] getQrCodeImage(Long id) {
+        DiningTableDTO dto = getTableDetail(id);
+        if (dto.getQrCodeUrl() == null || dto.getQrCodeUrl().isEmpty()) {
+            throw new RuntimeException("二维码不存在，请先生成");
+        }
+        return wechatService.fromDataUrl(dto.getQrCodeUrl());
     }
 
     /**
@@ -211,7 +194,7 @@ public class DiningTableService {
     }
 
     /**
-     * 转换为DTO
+     * Entity -> DTO
      */
     private DiningTableDTO toDTO(DiningTable table) {
         DiningTableDTO dto = new DiningTableDTO();

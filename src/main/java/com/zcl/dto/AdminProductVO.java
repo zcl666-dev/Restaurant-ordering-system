@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 @Data
 @Builder
@@ -25,5 +26,7 @@ public class AdminProductVO {
     private Integer hasOptions;
     private Integer isRecommend;
     private Integer isHot;
+    private Integer isExchangeable;
     private Integer status;
+    private List<Long> optionGroupIds; // 关联的规格组 ID 列表
 }

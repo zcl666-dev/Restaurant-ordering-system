@@ -44,6 +44,9 @@ public class CartService {
     @Autowired
     private OptionValueDao optionValueDao;
 
+    @Autowired
+    private UserExchangeVoucherDao userExchangeVoucherDao;
+
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
     /**
@@ -134,11 +137,29 @@ public class CartService {
         // 7. 更新购物车汇总
         updateCartSummary(cart);
 
-        // 8. 返回结果
+        // 8. 计算兑换券抵扣
+        BigDecimal voucherDiscount = BigDecimal.ZERO;
+        List<CartItem> allItems = cartItemDao.findByCart(cart);
+        for (CartItem ci : allItems) {
+            Product p = ci.getProduct();
+            if (p != null) {
+                try {
+                    UserExchangeVoucher voucher = userExchangeVoucherDao.findUnusedByUserIdAndProductId(userId, p.getId());
+                    if (voucher != null) {
+                        voucherDiscount = voucherDiscount.add(ci.getSubtotalAmount());
+                    }
+                } catch (Exception e) {
+                    log.warn("addToCart查询兑换券失败: productId={}: {}", p.getId(), e.getMessage());
+                }
+            }
+        }
+
+        // 9. 返回结果
         return CartAddResponse.builder()
                 .cartId(cart.getId())
                 .totalQuantity(cart.getTotalQuantity())
                 .totalAmount(cart.getTotalAmount())
+                .voucherDiscount(voucherDiscount)
                 .build();
     }
 
@@ -171,14 +192,22 @@ public class CartService {
         }
 
         List<CartItem> cartItems = cartItemDao.findByCart(cart);
-        List<CartItemVO> itemVOs = cartItems.stream()
-                .map(this::toCartItemVO)
-                .collect(Collectors.toList());
+        BigDecimal voucherDiscount = BigDecimal.ZERO;
+        List<CartItemVO> itemVOs = new java.util.ArrayList<>();
+
+        for (CartItem ci : cartItems) {
+            CartItemVO vo = toCartItemVO(ci, userId);
+            if (vo.getVoucherId() != null) {
+                voucherDiscount = voucherDiscount.add(ci.getSubtotalAmount());
+            }
+            itemVOs.add(vo);
+        }
 
         return CartResponse.builder()
                 .cartId(cart.getId())
                 .totalQuantity(cart.getTotalQuantity())
                 .totalAmount(cart.getTotalAmount())
+                .voucherDiscount(voucherDiscount)
                 .items(itemVOs)
                 .build();
     }
@@ -230,7 +259,7 @@ public class CartService {
         updateCartSummary(cart);
     }
 
-    private CartItemVO toCartItemVO(CartItem cartItem) {
+    private CartItemVO toCartItemVO(CartItem cartItem, Long userId) {
         List<OptionVO> options = parseOptionSnapshot(cartItem.getOptionSnapshot());
 
         Product product = cartItem.getProduct();
@@ -239,6 +268,19 @@ public class CartService {
         boolean invalid = product == null
                 || product.getStatus() != 1
                 || product.getStock() <= 0;
+
+        // 查询是否有可用兑换券
+        Long voucherId = null;
+        if (userId != null && productId != null && !invalid) {
+            try {
+                UserExchangeVoucher voucher = userExchangeVoucherDao.findUnusedByUserIdAndProductId(userId, productId);
+                if (voucher != null) {
+                    voucherId = voucher.getId();
+                }
+            } catch (Exception e) {
+                log.warn("查询兑换券失败, productId={}, userId={}: {}", productId, userId, e.getMessage());
+            }
+        }
 
         return CartItemVO.builder()
                 .itemId(cartItem.getId())
@@ -250,6 +292,7 @@ public class CartService {
                 .subtotalAmount(cartItem.getSubtotalAmount())
                 .options(options)
                 .invalid(invalid)
+                .voucherId(voucherId)
                 .build();
     }
 

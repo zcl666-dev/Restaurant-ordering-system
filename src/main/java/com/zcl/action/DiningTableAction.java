@@ -13,17 +13,16 @@ import com.zcl.service.DiningTableService;
 import org.apache.struts2.ServletActionContext;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Scope;
-import org.springframework.stereotype.Controller;
+import org.springframework.stereotype.Component;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.InputStream;
 import java.io.OutputStream;
-import java.net.URLEncoder;
 
-@Controller
+/**
+ * 桌台管理Action
+ */
+@Component
 @Scope("prototype")
 public class DiningTableAction extends ActionSupport {
 
@@ -41,9 +40,6 @@ public class DiningTableAction extends ActionSupport {
     private String tableName;
     private Integer status;
 
-    // 用于接收JSON请求体
-    private DiningTableCreateRequest tableRequest;
-
     private void writeJson(Result<?> result) {
         try {
             HttpServletResponse response = ServletActionContext.getResponse();
@@ -59,9 +55,13 @@ public class DiningTableAction extends ActionSupport {
      */
     public String list() {
         try {
+            System.out.println("[DEBUG] DiningTableAction.list() called, page=" + page + ", size=" + size);
             PageResult<DiningTableDTO> pageResult = diningTableService.getTableList(page, size, tableNo, tableName, status);
+            System.out.println("[DEBUG] getTableList returned " + pageResult.getContent().size() + " items");
             writeJson(Result.success("获取成功", pageResult));
         } catch (Exception e) {
+            System.err.println("[ERROR] DiningTableAction.list() failed: " + e.getMessage());
+            e.printStackTrace();
             writeJson(Result.error(500, "获取桌台列表失败: " + e.getMessage()));
         }
         return NONE;
@@ -124,13 +124,14 @@ public class DiningTableAction extends ActionSupport {
     }
 
     /**
-     * 生成二维码
+     * 生成单个桌台二维码
+     * 参数：id（桌台ID）
+     * 返回：base64 data URL
      */
     public String generateQr() {
         try {
-            HttpServletRequest request = ServletActionContext.getRequest();
-            String qrUrl = diningTableService.generateQrCode(id, request);
-            writeJson(Result.success("生成成功", qrUrl));
+            String dataUrl = diningTableService.generateQrCode(id);
+            writeJson(Result.success("生成成功", dataUrl));
         } catch (Exception e) {
             writeJson(Result.error(500, "生成二维码失败: " + e.getMessage()));
         }
@@ -138,12 +139,12 @@ public class DiningTableAction extends ActionSupport {
     }
 
     /**
-     * 批量生成二维码
+     * 批量生成二维码（所有未生成的桌台）
+     * 返回：成功/失败数量
      */
     public String generateAllQr() {
         try {
-            HttpServletRequest request = ServletActionContext.getRequest();
-            BatchGenerateResult result = diningTableService.batchGenerateQrCode(request);
+            BatchGenerateResult result = diningTableService.batchGenerateQrCode();
             writeJson(Result.success("批量生成完成", result));
         } catch (Exception e) {
             writeJson(Result.error(500, "批量生成二维码失败: " + e.getMessage()));
@@ -152,39 +153,27 @@ public class DiningTableAction extends ActionSupport {
     }
 
     /**
-     * 下载二维码
+     * 下载二维码图片
+     * 参数：id（桌台ID）
      */
     public String downloadQr() {
         try {
-            HttpServletRequest request = ServletActionContext.getRequest();
-            HttpServletResponse response = ServletActionContext.getResponse();
-
             DiningTableDTO dto = diningTableService.getTableDetail(id);
             if (dto.getQrCodeUrl() == null || dto.getQrCodeUrl().isEmpty()) {
-                writeJson(Result.error(404, "二维码不存在"));
+                writeJson(Result.error(404, "二维码不存在，请先生成"));
                 return NONE;
             }
 
-            String uploadPath = "upload";
-            String filePath = uploadPath + dto.getQrCodeUrl();
-            File file = new File(filePath);
+            byte[] imageData = diningTableService.getQrCodeImage(id);
 
-            if (!file.exists()) {
-                writeJson(Result.error(404, "二维码文件不存在"));
-                return NONE;
-            }
-
+            HttpServletResponse response = ServletActionContext.getResponse();
             response.setContentType("image/png");
-            String fileName = URLEncoder.encode(dto.getTableNo() + ".png", "UTF-8");
-            response.setHeader("Content-Disposition", "attachment; filename=" + fileName);
+            response.setHeader("Content-Disposition", "attachment; filename=" + dto.getTableNo() + ".png");
+            response.setContentLength(imageData.length);
 
-            try (InputStream in = new FileInputStream(file);
-                 OutputStream out = response.getOutputStream()) {
-                byte[] buffer = new byte[1024];
-                int len;
-                while ((len = in.read(buffer)) > 0) {
-                    out.write(buffer, 0, len);
-                }
+            try (OutputStream out = response.getOutputStream()) {
+                out.write(imageData);
+                out.flush();
             }
         } catch (Exception e) {
             writeJson(Result.error(500, "下载二维码失败: " + e.getMessage()));
@@ -205,6 +194,4 @@ public class DiningTableAction extends ActionSupport {
     public void setTableName(String tableName) { this.tableName = tableName; }
     public Integer getStatus() { return status; }
     public void setStatus(Integer status) { this.status = status; }
-    public DiningTableCreateRequest getTableRequest() { return tableRequest; }
-    public void setTableRequest(DiningTableCreateRequest tableRequest) { this.tableRequest = tableRequest; }
 }

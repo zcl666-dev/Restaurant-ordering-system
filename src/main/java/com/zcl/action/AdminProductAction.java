@@ -81,7 +81,8 @@ public class AdminProductAction extends ActionSupport {
         try {
             HttpServletRequest request = ServletActionContext.getRequest();
             ProductCreateRequest productRequest = objectMapper.readValue(request.getInputStream(), ProductCreateRequest.class);
-            adminProductService.updateProduct(id, productRequest);
+            Long productId = productRequest.getId() != null ? productRequest.getId() : id;
+            adminProductService.updateProduct(productId, productRequest);
             writeJson(Result.success("更新成功", null));
         } catch (Exception e) {
             writeJson(Result.error(500, "更新商品失败: " + e.getMessage()));

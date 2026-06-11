@@ -2,9 +2,20 @@
   <div>
     <div class="page-header">
       <h2>订单管理</h2>
+      <div class="voice-switch">
+        <span class="voice-label">语音提醒</span>
+        <el-switch v-model="voiceEnabled" @change="onVoiceChange" />
+      </div>
     </div>
 
     <div class="filter-bar">
+      <el-input
+        v-model="keyword"
+        placeholder="搜索订单号/桌号"
+        clearable
+        style="width: 200px;"
+        @keyup.enter="loadData"
+      />
       <el-select v-model="filterStatus" placeholder="订单状态" clearable style="width: 130px;" @change="loadData">
         <el-option :value="0" label="待支付" />
         <el-option :value="1" label="已支付" />
@@ -31,6 +42,12 @@
         </template>
       </el-table-column>
       <el-table-column prop="diningType" label="就餐方式" width="90" />
+      <el-table-column label="桌号" width="90">
+        <template #default="{ row }">
+          <el-tag v-if="row.tableNumber" type="success" size="small">{{ row.tableNumber }}</el-tag>
+          <span v-else class="no-table">-</span>
+        </template>
+      </el-table-column>
       <el-table-column prop="itemCount" label="商品数" width="70" />
       <el-table-column label="下单时间" width="170">
         <template #default="{ row }">{{ formatTime(row.createdAt) }}</template>
@@ -67,6 +84,13 @@ import { ref, onMounted } from 'vue'
 import { getOrderList, updateOrderStatus } from '../../api/order'
 import StatusTag from '../../components/StatusTag.vue'
 import { ElMessage } from 'element-plus'
+import { useOrderNotification } from '../../composables/useOrderNotification'
+
+const { voiceEnabled, setVoiceEnabled } = useOrderNotification()
+
+function onVoiceChange(val) {
+  setVoiceEnabled(val)
+}
 
 const list = ref([])
 const loading = ref(false)
@@ -75,6 +99,7 @@ const currentPage = ref(1)
 const pageSize = 10
 const filterStatus = ref(null)
 const dateRange = ref(null)
+const keyword = ref('')
 
 onMounted(() => loadData())
 
@@ -83,6 +108,7 @@ async function loadData() {
   try {
     const params = { page: currentPage.value - 1, size: pageSize }
     if (filterStatus.value !== null && filterStatus.value !== '') params.status = filterStatus.value
+    if (keyword.value) params.keyword = keyword.value
     if (dateRange.value) {
       params.startDate = dateRange.value[0]
       params.endDate = dateRange.value[1]
@@ -105,3 +131,26 @@ async function handleStatusChange(id, status) {
   loadData()
 }
 </script>
+
+<style scoped>
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.voice-switch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.voice-label {
+  font-size: 14px;
+  color: #606266;
+}
+
+.no-table {
+  color: #c0c4cc;
+}
+</style>

@@ -40,7 +40,7 @@ public class DiningTable {
     @Column(name = "create_time")
     private LocalDateTime createTime;
 
-    @Column(name = "qr_code_url", length = 500)
+    @Column(name = "qr_code_url", columnDefinition = "TEXT")
     private String qrCodeUrl;
 
     @PrePersist

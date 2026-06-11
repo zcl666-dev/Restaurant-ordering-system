@@ -44,6 +44,9 @@ src/main/resources/application.properties
 src/main/resources/application-*.properties
 src/main/resources/application-*.yml
 
+# === 敏感配置文件 ===
+src/main/resources/db.properties
+
 # === UniApp / Node ===
 vue-front/uniapp/node_modules/
 vue-front/uniapp/unpackage/

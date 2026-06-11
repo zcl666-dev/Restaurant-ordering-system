@@ -17,5 +17,6 @@ public class CartResponse {
     private Long cartId;
     private Integer totalQuantity;
     private BigDecimal totalAmount;
+    private BigDecimal voucherDiscount; // 券抵扣金额
     private List<CartItemVO> items;
 }

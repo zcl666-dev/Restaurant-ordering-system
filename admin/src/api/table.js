@@ -39,7 +39,7 @@ export function deleteTable(id) {
  * 生成二维码
  */
 export function generateQrCode(id) {
-  return request.post('/api_admin_table_generate_qr.action', { id })
+  return request.post('/api_admin_table_generate_qr.action', null, { params: { id } })
 }
 
 /**

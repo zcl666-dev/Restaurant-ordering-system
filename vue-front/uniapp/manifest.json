@@ -54,10 +54,11 @@
         "setting" : {
             "urlCheck" : false,
             "minified" : true,
-			"ignoreDevUnusedFiles": false,    
+			"ignoreDevUnusedFiles": false,
 			"ignoreUploadUnusedFiles": false
         },
-        "usingComponents" : true
+        "usingComponents" : true,
+        "lazyCodeLoading" : "requiredComponents"
     },
     "mp-alipay" : {
         "usingComponents" : true

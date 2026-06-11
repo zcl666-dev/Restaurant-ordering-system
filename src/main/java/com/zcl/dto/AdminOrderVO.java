@@ -21,6 +21,7 @@ public class AdminOrderVO {
     private Integer orderStatus;
     private Integer paymentStatus;
     private String diningType;
+    private String tableNumber;
     private Integer itemCount;
     private LocalDateTime createdAt;
 }

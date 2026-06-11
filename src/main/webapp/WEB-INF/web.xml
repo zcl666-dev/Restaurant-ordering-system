@@ -64,6 +64,19 @@
         <welcome-file>index.html</welcome-file>
     </welcome-file-list>
 
+    <!-- 文件上传Servlet -->
+    <servlet>
+        <servlet-name>fileUpload</servlet-name>
+        <servlet-class>com.zcl.servlet.FileUploadServlet</servlet-class>
+        <multipart-config>
+            <max-file-size>10485760</max-file-size>
+        </multipart-config>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>fileUpload</servlet-name>
+        <url-pattern>/api/upload</url-pattern>
+    </servlet-mapping>
+
     <!-- 静态资源Servlet - 用于提供上传文件的访问 -->
     <servlet>
         <servlet-name>default</servlet-name>

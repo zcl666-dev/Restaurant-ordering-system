@@ -46,7 +46,7 @@
           <text class="cart-icon">🛒</text>
           <text class="cart-badge">{{ cartData.totalQuantity }}</text>
         </view>
-        <text class="cart-total-amount">¥{{ cartData.totalAmount.toFixed(2) }}</text>
+        <text class="cart-total-amount">¥{{ actualPayAmount.toFixed(2) }}</text>
       </view>
       <view class="cart-bar-right">
         <text class="checkout-btn" @tap.stop="handleCheckout">去结算</text>
@@ -82,7 +82,13 @@
                 </text>
               </view>
               <view class="cart-item-bottom">
-                <text class="cart-item-price">¥{{ item.unitPrice.toFixed(2) }}</text>
+                <view class="cart-item-price-row">
+                  <text v-if="item.voucherId" class="cart-item-voucher-tag">兑换券</text>
+                  <text class="cart-item-price" :class="{ 'price-free': item.voucherId }">
+                    {{ item.voucherId ? '¥0.00' : '¥' + item.unitPrice.toFixed(2) }}
+                  </text>
+                  <text v-if="item.voucherId" class="cart-item-price-original">¥{{ item.unitPrice.toFixed(2) }}</text>
+                </view>
                 <view class="cart-item-stepper">
                   <text class="stepper-btn minus" @tap="handleDecrement(item)">−</text>
                   <text class="stepper-value">{{ item.quantity }}</text>
@@ -99,24 +105,21 @@
       </view>
     </view>
 
-    <!-- 订阅授权弹窗 -->
-    <SubscribePopup
-      ref="subscribePopupRef"
-      v-model:visible="showSubscribePopup"
-      @confirm="onSubscribeConfirm"
-      @cancel="onSubscribeCancel"
-    />
+    <!-- 自定义 TabBar -->
+    <TabBar />
   </view>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import CategoryProduct from '@/components/CategoryProduct/CategoryProduct.vue'
-import SubscribePopup from '@/components/SubscribePopup/SubscribePopup.vue'
+import TabBar from '@/components/TabBar/TabBar.vue'
 import { getProductDisplay } from '@/api/product.js'
+import { saveSubscribe } from '@/api/user.js'
 import { getCurrentCart, addToCart, updateCartItem } from '@/api/cart.js'
 import { createOrder } from '@/api/order.js'
+import { getTableNo } from '@/utils/tableStorage.js'
 
 const searchText = ref('')
 const defaultIndex = ref(0)
@@ -129,13 +132,25 @@ const cartData = ref({
   cartId: null,
   totalQuantity: 0,
   totalAmount: 0,
+  voucherDiscount: 0,
   items: []
 })
 
+// 实际应付金额 = 总价 - 券抵扣
+const actualPayAmount = computed(() => {
+  const total = cartData.value.totalAmount || 0
+  const discount = cartData.value.voucherDiscount || 0
+  return Math.max(0, total - discount)
+})
+
 const showCartPopup = ref(false)
-const showSubscribePopup = ref(false)
-const subscribePopupRef = ref(null)
-let pendingOrderId = null
+
+// 微信订阅消息模板ID
+const SUBSCRIBE_TMPL_IDS = [
+  'owRJNezMKIuvTypD-IS_CEcgYbe3rfPz2WdWQyR889c', // 下单成功通知
+  'J2kTKOFZHXW8TuRUYR-QfUPotm0uwS6ft0ikephjEjE', // 订单取消通知
+  'iSuL7Y8g3WyG-4VM0tbFrEwvqB95LDqp71k4vx1OTvQ'  // 用餐提醒
+]
 
 const fetchProductDisplay = async () => {
   isLoading.value = true
@@ -175,6 +190,7 @@ const fetchCart = async () => {
     cartData.value.cartId = data.cartId
     cartData.value.totalQuantity = data.totalQuantity || 0
     cartData.value.totalAmount = data.totalAmount || 0
+    cartData.value.voucherDiscount = data.voucherDiscount || 0
     cartData.value.items = data.items || []
   } catch (err) {
     cartData.value.cartId = null
@@ -200,16 +216,13 @@ const handleIncrement = async (item) => {
       productId: item.productId,
       optionSnapshot: optionSnapshot || null
     })
-    cartData.value.totalQuantity = res.totalQuantity || 0
-    cartData.value.totalAmount = res.totalAmount || 0
-    if (res.cartId != null) {
-      cartData.value.cartId = res.cartId
+    // 立即更新汇总信息（含券抵扣），再异步拉取完整数据
+    if (res) {
+      cartData.value.totalQuantity = res.totalQuantity || 0
+      cartData.value.totalAmount = res.totalAmount || 0
+      cartData.value.voucherDiscount = res.voucherDiscount || 0
     }
-    const localItem = cartData.value.items.find(i => i.itemId === item.itemId)
-    if (localItem) {
-      localItem.quantity = (localItem.quantity || 0) + 1
-      localItem.subtotalAmount = (localItem.unitPrice || 0) * localItem.quantity
-    }
+    fetchCart()
   } catch (err) {
     console.error('加购失败:', err)
   }
@@ -218,31 +231,12 @@ const handleIncrement = async (item) => {
 const handleDecrement = async (item) => {
   const newQuantity = item.quantity - 1
   try {
-    const res = await updateCartItem(item.itemId, { quantity: newQuantity })
-    cartData.value.totalQuantity = res.totalQuantity || 0
-    cartData.value.totalAmount = res.totalAmount || 0
-    if (newQuantity > 0) {
-      const localItem = cartData.value.items.find(i => i.itemId === item.itemId)
-      if (localItem) {
-        localItem.quantity = newQuantity
-        localItem.subtotalAmount = (localItem.unitPrice || 0) * newQuantity
-      }
-    } else {
-      const idx = cartData.value.items.findIndex(i => i.itemId === item.itemId)
-      if (idx !== -1) {
-        cartData.value.items.splice(idx, 1)
-      }
-      if (cartData.value.totalQuantity <= 0) {
-        showCartPopup.value = false
-      }
-    }
+    await updateCartItem(item.itemId, { quantity: newQuantity })
+    // 重新拉取购物车数据（更新汇总信息和券状态）
+    await fetchCart()
   } catch (err) {
     console.error('减购失败:', err)
   }
-}
-
-const getOptionLabel = (opt) => {
-  return `${opt.groupId}-${opt.optionId}`
 }
 
 const onCartItemImageError = (event, item) => {
@@ -273,12 +267,13 @@ const handleQuickAdd = async (product) => {
       productId: product.id,
       optionSnapshot: null
     })
-    cartData.value.totalQuantity = res.totalQuantity || 0
-    cartData.value.totalAmount = res.totalAmount || 0
-    if (res.cartId != null) {
-      cartData.value.cartId = res.cartId
+    // 立即更新汇总信息（含券抵扣），再异步拉取完整数据
+    if (res) {
+      cartData.value.totalQuantity = res.totalQuantity || 0
+      cartData.value.totalAmount = res.totalAmount || 0
+      cartData.value.voucherDiscount = res.voucherDiscount || 0
     }
-    // 如果有规格选项，跳转到商品详情页
+    fetchCart()
     uni.showToast({ title: '已加入购物车', icon: 'success' })
   } catch (err) {
     uni.showToast({ title: err.message || '加购失败', icon: 'none' })
@@ -288,63 +283,50 @@ const handleQuickAdd = async (product) => {
 const handleScroll = (data) => {
 }
 
-const handleCheckout = async () => {
-  try {
-    // 从存储中获取桌号
-    const tableNo = uni.getStorageSync('tableNo')
-    const orderData = {}
-    if (tableNo) {
-      orderData.tableNumber = tableNo
-      // 堂食时自动设置用餐方式为堂食
-      orderData.diningType = 1
+const handleCheckout = () => {
+  console.log('handleCheckout 被点击, tmplIds:', SUBSCRIBE_TMPL_IDS)
+  // 必须在用户点击的同步调用栈中直接调用，不能放在 await 之后
+  uni.requestSubscribeMessage({
+    tmplIds: SUBSCRIBE_TMPL_IDS,
+    success: async (res) => {
+      console.log('订阅授权成功:', JSON.stringify(res))
+      // 将授权结果保存到后端数据库
+      for (const tmplId of SUBSCRIBE_TMPL_IDS) {
+        const status = res[tmplId] === 'accept' ? 1 : 0
+        try {
+          await saveSubscribe({ templateId: tmplId, status })
+          console.log('保存订阅成功:', tmplId, status)
+        } catch (err) {
+          console.error('保存订阅失败:', tmplId, err)
+        }
+      }
+    },
+    fail: (err) => {
+      console.log('订阅授权失败:', JSON.stringify(err))
+    },
+    complete: async () => {
+      console.log('订阅授权complete，开始创建订单')
+      try {
+        const tableNo = getTableNo()
+        const orderData = {}
+        if (tableNo) {
+          orderData.tableNumber = tableNo
+          orderData.diningType = 1
+        }
+        const res = await createOrder(orderData)
+        uni.navigateTo({
+          url: `/pages/order-detail/order-detail?id=${res.orderId}`
+        })
+      } catch (err) {
+        uni.showToast({
+          title: err.message || '下单失败',
+          icon: 'none'
+        })
+      }
     }
-    const res = await createOrder(orderData)
-    pendingOrderId = res.orderId
-
-    // 检查用户是否已经勾选了"总是保持以上选择"
-    if (subscribePopupRef.value && subscribePopupRef.value.hasKeepChoice()) {
-      // 已保存选择，静默调用微信订阅API（不弹自定义弹窗，但仍会弹微信原生授权）
-      await subscribePopupRef.value.silentRequestSubscribe()
-      // 直接跳转到订单详情页
-      uni.navigateTo({
-        url: `/pages/order-detail/order-detail?id=${pendingOrderId}`
-      })
-      pendingOrderId = null
-    } else {
-      // 首次，显示自定义订阅授权弹窗
-      showSubscribePopup.value = true
-    }
-  } catch (err) {
-    uni.showToast({
-      title: err.message || '下单失败',
-      icon: 'none'
-    })
-  }
+  })
 }
 
-const onSubscribeConfirm = (selectedTemplates) => {
-  console.log('用户选择的订阅模板:', selectedTemplates)
-
-  // 跳转到订单详情页
-  if (pendingOrderId) {
-    uni.navigateTo({
-      url: `/pages/order-detail/order-detail?id=${pendingOrderId}`
-    })
-    pendingOrderId = null
-  }
-}
-
-const onSubscribeCancel = () => {
-  console.log('用户取消了订阅授权')
-
-  // 即使取消订阅，也跳转到订单详情页
-  if (pendingOrderId) {
-    uni.navigateTo({
-      url: `/pages/order-detail/order-detail?id=${pendingOrderId}`
-    })
-    pendingOrderId = null
-  }
-}
 
 const handleImageLoad = () => {
   if (categoryProductRef.value) {
@@ -497,7 +479,7 @@ onShow(() => {
 /* 购物车底部栏 */
 .cart-bar {
   position: fixed;
-  bottom: 0;
+  bottom: 110rpx;
   left: 0;
   right: 0;
   height: 110rpx;
@@ -508,7 +490,6 @@ onShow(() => {
   align-items: center;
   justify-content: space-between;
   padding: 0 30rpx;
-  padding-bottom: calc(0rpx + env(safe-area-inset-bottom));
   z-index: 200;
   border-radius: 24rpx 24rpx 0 0;
 }
@@ -572,7 +553,7 @@ onShow(() => {
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 300;
+  z-index: 1000;
   visibility: hidden;
   opacity: 0;
   transition: all 0.3s ease;
@@ -710,6 +691,32 @@ onShow(() => {
   color: #FF6B6B;
   font-weight: bold;
   flex-shrink: 0;
+}
+
+.cart-item-price-row {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+}
+
+.cart-item-voucher-tag {
+  font-size: 20rpx;
+  color: #FF6B6B;
+  background: #fff5f5;
+  border: 1rpx solid #FFDADA;
+  border-radius: 6rpx;
+  padding: 2rpx 10rpx;
+  flex-shrink: 0;
+}
+
+.price-free {
+  color: #67c23a;
+}
+
+.cart-item-price-original {
+  font-size: 24rpx;
+  color: #ccc;
+  text-decoration: line-through;
 }
 
 .cart-item-stepper {

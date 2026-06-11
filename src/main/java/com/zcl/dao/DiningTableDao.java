@@ -23,26 +23,25 @@ public class DiningTableDao extends BaseDao<DiningTable, Long> {
     public List<DiningTable> findByPage(int page, int size, String tableNo, String tableName, Integer status) {
         StringBuilder hql = new StringBuilder("FROM DiningTable WHERE 1=1");
         if (tableNo != null && !tableNo.isEmpty()) {
-            hql.append(" AND tableNo LIKE ?1");
+            hql.append(" AND tableNo LIKE :tableNo");
         }
         if (tableName != null && !tableName.isEmpty()) {
-            hql.append(" AND tableName LIKE ?2");
+            hql.append(" AND tableName LIKE :tableName");
         }
         if (status != null) {
-            hql.append(" AND status = ?3");
+            hql.append(" AND status = :status");
         }
         hql.append(" ORDER BY id ASC");
 
         var query = getCurrentSession().createQuery(hql.toString());
-        int paramIndex = 1;
         if (tableNo != null && !tableNo.isEmpty()) {
-            query.setParameter(paramIndex++, "%" + tableNo + "%");
+            query.setParameter("tableNo", "%" + tableNo + "%");
         }
         if (tableName != null && !tableName.isEmpty()) {
-            query.setParameter(paramIndex++, "%" + tableName + "%");
+            query.setParameter("tableName", "%" + tableName + "%");
         }
         if (status != null) {
-            query.setParameter(paramIndex++, status);
+            query.setParameter("status", status);
         }
 
         query.setFirstResult(page * size);
@@ -56,25 +55,24 @@ public class DiningTableDao extends BaseDao<DiningTable, Long> {
     public long countByCondition(String tableNo, String tableName, Integer status) {
         StringBuilder hql = new StringBuilder("SELECT COUNT(*) FROM DiningTable WHERE 1=1");
         if (tableNo != null && !tableNo.isEmpty()) {
-            hql.append(" AND tableNo LIKE ?1");
+            hql.append(" AND tableNo LIKE :tableNo");
         }
         if (tableName != null && !tableName.isEmpty()) {
-            hql.append(" AND tableName LIKE ?2");
+            hql.append(" AND tableName LIKE :tableName");
         }
         if (status != null) {
-            hql.append(" AND status = ?3");
+            hql.append(" AND status = :status");
         }
 
         var query = getCurrentSession().createQuery(hql.toString());
-        int paramIndex = 1;
         if (tableNo != null && !tableNo.isEmpty()) {
-            query.setParameter(paramIndex++, "%" + tableNo + "%");
+            query.setParameter("tableNo", "%" + tableNo + "%");
         }
         if (tableName != null && !tableName.isEmpty()) {
-            query.setParameter(paramIndex++, "%" + tableName + "%");
+            query.setParameter("tableName", "%" + tableName + "%");
         }
         if (status != null) {
-            query.setParameter(paramIndex++, status);
+            query.setParameter("status", status);
         }
 
         return (long) query.uniqueResult();

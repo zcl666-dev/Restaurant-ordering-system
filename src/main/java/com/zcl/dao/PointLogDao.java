@@ -32,4 +32,30 @@ public class PointLogDao extends BaseDao<PointLog, Long> {
                 .setParameter("userId", userId)
                 .uniqueResult();
     }
+
+    @SuppressWarnings("unchecked")
+    public List<PointLog> findAllWithPaging(int offset, int limit) {
+        return getCurrentSession()
+                .createQuery("FROM PointLog ORDER BY createdAt DESC")
+                .setFirstResult(offset)
+                .setMaxResults(limit)
+                .list();
+    }
+
+    @SuppressWarnings("unchecked")
+    public List<PointLog> findWithPaging(String keyword, int offset, int limit) {
+        return getCurrentSession()
+                .createQuery("FROM PointLog WHERE user.nickName LIKE :kw OR remark LIKE :kw ORDER BY createdAt DESC")
+                .setParameter("kw", "%" + keyword + "%")
+                .setFirstResult(offset)
+                .setMaxResults(limit)
+                .list();
+    }
+
+    public long countByKeyword(String keyword) {
+        return (long) getCurrentSession()
+                .createQuery("SELECT COUNT(*) FROM PointLog WHERE user.nickName LIKE :kw OR remark LIKE :kw")
+                .setParameter("kw", "%" + keyword + "%")
+                .uniqueResult();
+    }
 }

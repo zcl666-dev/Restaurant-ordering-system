@@ -63,6 +63,9 @@ public class Product {
     @Column(name = "is_hot", nullable = false)
     private Integer isHot = 0; // 是否热销
 
+    @Column(name = "is_exchangeable", nullable = false)
+    private Integer isExchangeable = 0; // 是否为可兑换商品：0-否，1-是
+
     @Column(name = "status", nullable = false)
     private Integer status = 1; // 0下架 1上架 2售罄
 

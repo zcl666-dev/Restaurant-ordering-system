@@ -56,15 +56,19 @@ public class AdminOrderService {
             end = LocalDateTime.parse(endDate + "T23:59:59");
         }
 
+        // keyword 同时搜索订单号和桌号
         if (status != null && start != null && end != null) {
             orders = orderDao.findByStatusAndDateRangeWithPaging(status, start, end, offset, size);
-            totalElements = orderDao.count(); // 简化处理
+            totalElements = orderDao.count();
         } else if (status != null) {
             orders = orderDao.findByStatusWithPaging(status, offset, size);
             totalElements = orderDao.countByStatus(status);
         } else if (start != null && end != null) {
             orders = orderDao.findByDateRangeWithPaging(start, end, offset, size);
             totalElements = orderDao.countBetween(start, end);
+        } else if (keyword != null && !keyword.trim().isEmpty()) {
+            orders = orderDao.findByKeywordWithPaging(keyword.trim(), offset, size);
+            totalElements = orderDao.countByKeyword(keyword.trim());
         } else {
             orders = orderDao.findAllWithPaging(offset, size);
             totalElements = orderDao.count();
@@ -117,6 +121,21 @@ public class AdminOrderService {
         }
     }
 
+    /**
+     * 查询 id > lastOrderId 的已支付新订单（用于轮询新订单提醒）
+     */
+    public List<AdminOrderVO> getNewPaidOrders(Long lastOrderId) {
+        List<Orders> orders = orderDao.findPaidOrdersAfterId(lastOrderId);
+        return orders.stream().map(this::toOrderVO).collect(Collectors.toList());
+    }
+
+    /**
+     * 获取已支付订单中最大的 id（用于前端初始化 lastOrderId）
+     */
+    public Long getMaxPaidOrderId() {
+        return orderDao.findMaxPaidOrderId();
+    }
+
     private AdminOrderVO toOrderVO(Orders order) {
         List<OrderItem> items = orderItemDao.findByOrder(order);
         return AdminOrderVO.builder()
@@ -128,6 +147,7 @@ public class AdminOrderService {
                 .orderStatus(order.getOrderStatus())
                 .paymentStatus(order.getPaymentStatus())
                 .diningType(order.getDiningType())
+                .tableNumber(order.getTableNumber())
                 .itemCount(items.size())
                 .createdAt(order.getCreatedAt())
                 .build();

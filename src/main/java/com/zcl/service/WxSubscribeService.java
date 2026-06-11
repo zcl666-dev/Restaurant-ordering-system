@@ -11,7 +11,6 @@ import com.zcl.entity.User;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -32,7 +31,6 @@ public class WxSubscribeService {
 
     private static final Logger log = LoggerFactory.getLogger(WxSubscribeService.class);
 
-    private static final String WX_ACCESS_TOKEN_URL = "https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid=%s&secret=%s";
     private static final String WX_SUBSCRIBE_MESSAGE_URL = "https://api.weixin.qq.com/cgi-bin/message/subscribe/send?access_token=%s";
 
     // 模板ID
@@ -40,11 +38,8 @@ public class WxSubscribeService {
     private static final String TEMPLATE_ORDER_CANCEL = "J2kTKOFZHXW8TuRUYR-QfUPotm0uwS6ft0ikephjEjE";
     private static final String TEMPLATE_MEAL_REMIND = "iSuL7Y8g3WyG-4VM0tbFrEwvqB95LDqp71k4vx1OTvQ";
 
-    @Value("${wx.mini.appid}")
-    private String appid;
-
-    @Value("${wx.mini.secret}")
-    private String secret;
+    @Autowired
+    private WechatService wechatService;
 
     @Autowired
     private SubscribeTemplateDao subscribeTemplateDao;
@@ -55,10 +50,6 @@ public class WxSubscribeService {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private final RestTemplate restTemplate = new RestTemplate();
-
-    // 缓存 access_token
-    private String cachedAccessToken;
-    private long accessTokenExpireTime;
 
     /**
      * 发送下单成功通知
@@ -141,8 +132,8 @@ public class WxSubscribeService {
             log.info("准备发送订阅消息: userId={}, openId={}, templateId={}, orderId={}",
                     user.getId(), user.getOpenId(), templateId, orderId);
 
-            // 2. 获取 access_token
-            String accessToken = getAccessToken();
+            // 2. 获取 access_token（使用共享缓存）
+            String accessToken = wechatService.getAccessToken();
             if (accessToken == null) {
                 log.error("获取 access_token 失败");
                 return;
@@ -179,38 +170,6 @@ public class WxSubscribeService {
             }
         } catch (Exception e) {
             log.error("发送订阅消息异常: userId={}, templateId={}", user.getId(), templateId, e);
-        }
-    }
-
-    /**
-     * 获取 access_token
-     */
-    private String getAccessToken() {
-        // 检查缓存是否有效
-        if (cachedAccessToken != null && System.currentTimeMillis() < accessTokenExpireTime) {
-            return cachedAccessToken;
-        }
-
-        try {
-            String url = String.format(WX_ACCESS_TOKEN_URL, appid, secret);
-
-            String response = restTemplate.getForObject(url, String.class);
-
-            JsonNode jsonNode = objectMapper.readTree(response);
-
-            if (jsonNode.has("errcode") && jsonNode.get("errcode").asInt() != 0) {
-                log.error("获取 access_token 失败: {}", response);
-                return null;
-            }
-
-            cachedAccessToken = jsonNode.get("access_token").asText();
-            int expiresIn = jsonNode.get("expires_in").asInt();
-            accessTokenExpireTime = System.currentTimeMillis() + (expiresIn - 300) * 1000L;
-
-            return cachedAccessToken;
-        } catch (Exception e) {
-            log.error("获取 access_token 异常", e);
-            return null;
         }
     }
 

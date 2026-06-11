@@ -170,6 +170,13 @@
             <version>3.5.3</version>
         </dependency>
 
+        <!-- ====== 阿里云 OSS SDK ====== -->
+        <dependency>
+            <groupId>com.aliyun.oss</groupId>
+            <artifactId>aliyun-sdk-oss</artifactId>
+            <version>3.17.4</version>
+        </dependency>
+
         <!-- ====== JUnit 5 ====== -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>

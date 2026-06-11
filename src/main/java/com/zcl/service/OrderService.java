@@ -51,6 +51,9 @@ public class OrderService {
     private OptionValueDao optionValueDao;
 
     @Autowired
+    private UserExchangeVoucherDao userExchangeVoucherDao;
+
+    @Autowired
     private WxSubscribeService wxSubscribeService;
 
     @Autowired
@@ -96,13 +99,28 @@ public class OrderService {
 
         String orderNo = generateOrderNo();
 
+        // 检查兑换券抵扣
+        BigDecimal discountAmount = BigDecimal.ZERO;
+        List<UserExchangeVoucher> usedVouchers = new ArrayList<>();
+
+        for (CartItem ci : cartItems) {
+            Product product = ci.getProduct();
+            if (product != null) {
+                UserExchangeVoucher voucher = userExchangeVoucherDao.findUnusedByUserIdAndProductId(userId, product.getId());
+                if (voucher != null) {
+                    discountAmount = discountAmount.add(ci.getSubtotalAmount());
+                    usedVouchers.add(voucher);
+                }
+            }
+        }
+
         Orders order = new Orders();
         order.setOrderNo(orderNo);
         order.setUser(user);
         order.setCart(cart);
         order.setTotalAmount(cart.getTotalAmount());
-        order.setDiscountAmount(BigDecimal.ZERO);
-        order.setPayAmount(cart.getTotalAmount());
+        order.setDiscountAmount(discountAmount);
+        order.setPayAmount(cart.getTotalAmount().subtract(discountAmount));
         order.setPointsEarned(0);
         order.setOrderStatus(0);
         order.setPaymentStatus(0);
@@ -110,6 +128,13 @@ public class OrderService {
         order.setDiningType(String.valueOf(diningType));
         order.setTableNumber(tableNumber);
         orderDao.save(order);
+
+        // 标记已使用的兑换券
+        for (UserExchangeVoucher voucher : usedVouchers) {
+            voucher.setStatus(1); // 已使用
+            voucher.setUsedAt(LocalDateTime.now());
+            userExchangeVoucherDao.save(voucher);
+        }
 
         for (CartItem ci : cartItems) {
             OrderItem orderItem = new OrderItem();
@@ -131,7 +156,7 @@ public class OrderService {
         cart.setTotalAmount(BigDecimal.ZERO);
         cartDao.save(cart);
 
-        log.info("订单创建成功: orderNo={}, userId={}, payAmount={}", orderNo, userId, order.getPayAmount());
+        log.info("订单创建成功: orderNo={}, userId={}, payAmount={}, discount={}", orderNo, userId, order.getPayAmount(), discountAmount);
 
         return OrderCreateResponse.builder().orderId(order.getId()).build();
     }
@@ -160,6 +185,8 @@ public class OrderService {
                 .orderNo(order.getOrderNo())
                 .orderStatus(order.getOrderStatus())
                 .paymentStatus(order.getPaymentStatus())
+                .totalAmount(order.getTotalAmount())
+                .discountAmount(order.getDiscountAmount())
                 .payAmount(order.getPayAmount())
                 .diningType(order.getDiningType())
                 .tableNumber(order.getTableNumber())
@@ -301,14 +328,18 @@ public class OrderService {
 
         User user = order.getUser();
 
-        if (user.getBalance().compareTo(order.getPayAmount()) < 0) {
-            throw new RuntimeException("余额不足");
+        // 如果实付金额 > 0，需要扣余额
+        int pointsEarned = 0;
+        if (order.getPayAmount().compareTo(BigDecimal.ZERO) > 0) {
+            if (user.getBalance().compareTo(order.getPayAmount()) < 0) {
+                throw new RuntimeException("余额不足");
+            }
+
+            user.setBalance(user.getBalance().subtract(order.getPayAmount()));
+
+            pointsEarned = order.getPayAmount().intValue();
+            user.setPointsBalance(user.getPointsBalance() + pointsEarned);
         }
-
-        user.setBalance(user.getBalance().subtract(order.getPayAmount()));
-
-        int pointsEarned = order.getPayAmount().intValue();
-        user.setPointsBalance(user.getPointsBalance() + pointsEarned);
 
         user.setTotalSpentAmount(user.getTotalSpentAmount().add(order.getPayAmount()));
         user.setTotalOrderCount(user.getTotalOrderCount() + 1);
@@ -318,7 +349,7 @@ public class OrderService {
         order.setOrderStatus(2);
         order.setPaymentTime(LocalDateTime.now());
         order.setPointsEarned(pointsEarned);
-        order.setPaymentMethod("余额支付");
+        order.setPaymentMethod(order.getPayAmount().compareTo(BigDecimal.ZERO) > 0 ? "余额支付" : "兑换券抵扣");
         orderDao.save(order);
 
         // 记录积分流水

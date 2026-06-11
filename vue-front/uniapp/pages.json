@@ -48,6 +48,18 @@
 			"style": {
 				"navigationBarTitleText": "积分详情"
 			}
+		},
+		{
+			"path": "pages/points-exchange/points-exchange",
+			"style": {
+				"navigationBarTitleText": "积分兑换"
+			}
+		},
+		{
+			"path": "pages/voucher/voucher",
+			"style": {
+				"navigationBarTitleText": "我的兑换券"
+			}
 		}
 	],
 	"globalStyle": {
@@ -57,6 +69,7 @@
 		"backgroundColor": "#F8F8F8"
 	},
 	"tabBar": {
+		"custom": true,
 		"color": "#999999",
 		"selectedColor": "#FF6B6B",
 		"backgroundColor": "#ffffff",
@@ -64,27 +77,19 @@
 		"list": [
 			{
 				"pagePath": "pages/index/index",
-				"text": "首页",
-				"iconPath": "/static/tabbar/index.png",
-				"selectedIconPath": "/static/tabbar/index-s.png"
+				"text": "首页"
 			},
 			{
 				"pagePath": "pages/order/order",
-				"text": "点餐",
-				"iconPath": "/static/tabbar/sweet_potato.png",
-				"selectedIconPath": "/static/tabbar/sweet_potato-s.png"
+				"text": "点餐"
 			},
 			{
 				"pagePath": "pages/bill/bill",
-				"text": "订单",
-				"iconPath": "/static/tabbar/bill.png",
-				"selectedIconPath": "/static/tabbar/bill-s.png"
+				"text": "订单"
 			},
 			{
 				"pagePath": "pages/user/user",
-				"text": "个人",
-				"iconPath": "/static/tabbar/user.png",
-				"selectedIconPath": "/static/tabbar/user-s.png"
+				"text": "个人"
 			}
 		]
 	},

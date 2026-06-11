@@ -35,6 +35,14 @@
           <el-icon><Grid /></el-icon>
           <template #title>桌台管理</template>
         </el-menu-item>
+        <el-sub-menu index="/points">
+          <template #title>
+            <el-icon><Coin /></el-icon>
+            <span>积分管理</span>
+          </template>
+          <el-menu-item index="/point-logs">积分流水</el-menu-item>
+          <el-menu-item index="/points-mall">积分商城</el-menu-item>
+        </el-sub-menu>
       </el-menu>
     </el-aside>
 
@@ -74,20 +82,33 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getAdminInfo, removeToken } from '../../utils/auth'
+import { useOrderNotification } from '../../composables/useOrderNotification'
 
 const route = useRoute()
 const router = useRouter()
 const isCollapse = ref(false)
 const adminInfo = getAdminInfo()
 
+// 新订单提醒
+const { startPolling, stopPolling } = useOrderNotification()
+
+onMounted(() => {
+  startPolling()
+})
+
+onUnmounted(() => {
+  stopPolling()
+})
+
 const activeMenu = computed(() => {
   const path = route.path
   if (path.startsWith('/products')) return '/products'
   if (path.startsWith('/orders')) return '/orders'
   if (path.startsWith('/dining-tables')) return '/dining-tables'
+  if (path.startsWith('/point-logs') || path.startsWith('/points-mall')) return path
   return path
 })
 
