@@ -46,7 +46,7 @@ public class AdminAuthAction extends ActionSupport {
             AdminLoginResponse loginResponse = adminAuthService.login(loginRequest);
             writeJson(Result.success("登录成功", loginResponse));
         } catch (Exception e) {
-            writeJson(Result.error(401, e.getMessage()));
+            writeJson(Result.error(500, e.getMessage()));
         }
         return NONE;
     }

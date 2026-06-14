@@ -152,6 +152,17 @@ public class OrderDao extends BaseDao<Orders, Long> {
     }
 
     /**
+     * 查询已过期的待制作订单（用于定时任务自动转为制作中）
+     */
+    @SuppressWarnings("unchecked")
+    public List<Orders> findExpiredPendingOrders(LocalDateTime now) {
+        return getCurrentSession()
+                .createQuery("FROM Orders WHERE orderStatus = 1 AND cancelDeadline < :now")
+                .setParameter("now", now)
+                .list();
+    }
+
+    /**
      * 按关键词搜索（订单号或桌号模糊匹配）
      */
     @SuppressWarnings("unchecked")

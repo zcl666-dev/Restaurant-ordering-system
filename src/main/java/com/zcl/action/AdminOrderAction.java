@@ -7,8 +7,11 @@ import com.opensymphony.xwork2.ActionSupport;
 import com.zcl.dto.AdminOrderDetailVO;
 import com.zcl.dto.AdminOrderVO;
 import com.zcl.dto.AdminOrderUpdateRequest;
+import com.zcl.dto.CategoryWithProductsVO;
 import com.zcl.dto.PageResult;
+import com.zcl.dto.ProductDetailVO;
 import com.zcl.dto.Result;
+import com.zcl.dto.StaffOrderRequest;
 import com.zcl.service.AdminOrderService;
 import org.apache.struts2.ServletActionContext;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -82,6 +85,45 @@ public class AdminOrderAction extends ActionSupport {
         return NONE;
     }
 
+    /**
+     * 餐厅开始制作
+     */
+    public String startProduction() {
+        try {
+            adminOrderService.startProduction(id);
+            writeJson(Result.success("已开始制作", null));
+        } catch (Exception e) {
+            writeJson(Result.error(500, e.getMessage()));
+        }
+        return NONE;
+    }
+
+    /**
+     * 餐厅拒绝订单
+     */
+    public String rejectOrder() {
+        try {
+            adminOrderService.rejectOrder(id);
+            writeJson(Result.success("已拒绝订单并退款", null));
+        } catch (Exception e) {
+            writeJson(Result.error(500, e.getMessage()));
+        }
+        return NONE;
+    }
+
+    /**
+     * 餐厅完成制作
+     */
+    public String completeProduction() {
+        try {
+            adminOrderService.completeProduction(id);
+            writeJson(Result.success("订单已完成", null));
+        } catch (Exception e) {
+            writeJson(Result.error(500, e.getMessage()));
+        }
+        return NONE;
+    }
+
     public String checkNew() {
         try {
             if (lastOrderId == null) {
@@ -96,6 +138,60 @@ public class AdminOrderAction extends ActionSupport {
             }
         } catch (Exception e) {
             writeJson(Result.error(500, "检查新订单失败: " + e.getMessage()));
+        }
+        return NONE;
+    }
+
+    /**
+     * 获取未处理订单数量（状态=1 待制作）
+     */
+    public String unprocessedCount() {
+        try {
+            long count = adminOrderService.getUnprocessedCount();
+            writeJson(Result.success("获取成功", Map.of("count", count)));
+        } catch (Exception e) {
+            writeJson(Result.error(500, "获取未处理订单数失败: " + e.getMessage()));
+        }
+        return NONE;
+    }
+
+    /**
+     * 代客点餐 - 获取商品详情（含规格信息）
+     */
+    public String staffProductDetail() {
+        try {
+            ProductDetailVO detail = adminOrderService.getStaffProductDetail(id);
+            writeJson(Result.success("获取成功", detail));
+        } catch (Exception e) {
+            writeJson(Result.error(500, "获取商品详情失败: " + e.getMessage()));
+        }
+        return NONE;
+    }
+
+    /**
+     * 代客点餐 - 获取商品列表
+     */
+    public String staffProducts() {
+        try {
+            List<CategoryWithProductsVO> products = adminOrderService.getProductsForStaffOrder();
+            writeJson(Result.success("获取成功", products));
+        } catch (Exception e) {
+            writeJson(Result.error(500, "获取商品列表失败: " + e.getMessage()));
+        }
+        return NONE;
+    }
+
+    /**
+     * 代客点餐 - 创建订单
+     */
+    public String staffCreateOrder() {
+        try {
+            HttpServletRequest request = ServletActionContext.getRequest();
+            StaffOrderRequest orderRequest = objectMapper.readValue(request.getInputStream(), StaffOrderRequest.class);
+            Long orderId = adminOrderService.staffCreateOrder(orderRequest);
+            writeJson(Result.success("下单成功", Map.of("orderId", orderId)));
+        } catch (Exception e) {
+            writeJson(Result.error(500, "下单失败: " + e.getMessage()));
         }
         return NONE;
     }

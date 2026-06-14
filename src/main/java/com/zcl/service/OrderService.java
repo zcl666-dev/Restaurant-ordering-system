@@ -125,7 +125,7 @@ public class OrderService {
         order.setOrderStatus(0);
         order.setPaymentStatus(0);
         order.setRemark(remark);
-        order.setDiningType(String.valueOf(diningType));
+        order.setDiningType(diningType != null ? String.valueOf(diningType) : null);
         order.setTableNumber(tableNumber);
         orderDao.save(order);
 
@@ -191,11 +191,15 @@ public class OrderService {
                 .diningType(order.getDiningType())
                 .tableNumber(order.getTableNumber())
                 .remark(order.getRemark())
+                .cancelDeadline(order.getCancelDeadline())
                 .createdAt(order.getCreatedAt())
                 .items(itemVOs)
                 .build();
     }
 
+    /**
+     * 用户取消订单（仅待制作状态且在倒计时内可取消，自动退款）
+     */
     public void cancelOrder(Long userId, Long orderId) {
         if (userId == null) {
             throw new RuntimeException("用户未登录");
@@ -210,20 +214,24 @@ public class OrderService {
             throw new RuntimeException("无权操作此订单");
         }
 
-        if (order.getOrderStatus() != 0) {
-            throw new RuntimeException("只有待支付订单才能取消");
+        // 只有待制作(1)状态才能取消
+        if (order.getOrderStatus() != 1) {
+            throw new RuntimeException("只有待制作订单才能取消");
         }
 
-        List<OrderItem> items = orderItemDao.findByOrder(order);
-        for (OrderItem item : items) {
-            Product product = item.getProduct();
-            if (product != null) {
-                product.setStock(product.getStock() + item.getQuantity());
-                productDao.save(product);
-            }
+        // 校验倒计时
+        if (order.getCancelDeadline() == null || LocalDateTime.now().isAfter(order.getCancelDeadline())) {
+            throw new RuntimeException("取消时间已过，无法取消订单");
         }
 
-        order.setOrderStatus(5);
+        // 执行退款逻辑（退回余额 + 退回兑换券 + 扣除积分 + 恢复库存）
+        processRefund(order);
+
+        order.setOrderStatus(4); // 已取消
+        order.setPaymentStatus(2); // 已退款
+        order.setRefundAmount(order.getPayAmount());
+        order.setRefundTime(LocalDateTime.now());
+        order.setCancelDeadline(null);
         orderDao.save(order);
 
         // 发送订单取消通知
@@ -233,7 +241,7 @@ public class OrderService {
             log.error("发送订单取消通知失败: orderNo={}", order.getOrderNo(), e);
         }
 
-        log.info("订单已取消: orderNo={}", order.getOrderNo());
+        log.info("订单已取消并退款: orderNo={}, refundAmount={}", order.getOrderNo(), order.getRefundAmount());
     }
 
     public void updateDiningType(Long userId, Long orderId, Integer diningType) {
@@ -254,12 +262,15 @@ public class OrderService {
             throw new RuntimeException("只有待支付订单才能修改就餐方式");
         }
 
-        order.setDiningType(String.valueOf(diningType));
+        order.setDiningType(diningType != null ? String.valueOf(diningType) : null);
         orderDao.save(order);
 
         log.info("更新就餐方式: orderId={}, diningType={}", orderId, diningType);
     }
 
+    /**
+     * 用户确认完成订单
+     */
     public void completeOrder(Long userId, Long orderId) {
         if (userId == null) {
             throw new RuntimeException("用户未登录");
@@ -274,20 +285,21 @@ public class OrderService {
             throw new RuntimeException("无权操作此订单");
         }
 
-        if (order.getOrderStatus() == 5) {
+        if (order.getOrderStatus() == 4) {
             throw new RuntimeException("订单已取消，无法完成");
         }
 
-        if (order.getOrderStatus() == 4) {
+        if (order.getOrderStatus() == 3) {
             throw new RuntimeException("订单已完成");
         }
 
-        // 只有制作中(2)或待取餐(3)的状态才能完成
-        if (order.getOrderStatus() != 2 && order.getOrderStatus() != 3) {
+        // 只有制作中(2)才能确认完成
+        if (order.getOrderStatus() != 2) {
             throw new RuntimeException("当前订单状态无法完成");
         }
 
-        order.setOrderStatus(4);
+        order.setOrderStatus(3); // 已完成
+        order.setCompletedTime(LocalDateTime.now());
         orderDao.save(order);
 
         // 发送用餐提醒通知
@@ -298,6 +310,78 @@ public class OrderService {
         }
 
         log.info("订单已完成: orderNo={}", order.getOrderNo());
+    }
+
+    /**
+     * 餐厅开始制作（待制作→制作中）
+     */
+    public void startProduction(Long orderId) {
+        Orders order = orderDao.findById(orderId);
+        if (order == null) {
+            throw new RuntimeException("订单不存在");
+        }
+        if (order.getOrderStatus() != 1) {
+            throw new RuntimeException("只有待制作订单才能开始制作");
+        }
+        order.setOrderStatus(2); // 制作中
+        order.setCancelDeadline(null); // 清空倒计时
+        orderDao.save(order);
+        log.info("订单开始制作: orderNo={}", order.getOrderNo());
+    }
+
+    /**
+     * 餐厅拒绝订单（不限倒计时，退回余额 + 兑换券 + 扣除积分）
+     */
+    public void rejectOrder(Long orderId) {
+        Orders order = orderDao.findById(orderId);
+        if (order == null) {
+            throw new RuntimeException("订单不存在");
+        }
+        if (order.getOrderStatus() != 1) {
+            throw new RuntimeException("只有待制作订单才能拒绝");
+        }
+
+        // 执行退款逻辑（退回余额 + 退回兑换券 + 扣除积分 + 恢复库存）
+        processRefund(order);
+
+        order.setOrderStatus(4); // 已取消
+        order.setPaymentStatus(2); // 已退款
+        order.setRefundAmount(order.getPayAmount());
+        order.setRefundTime(LocalDateTime.now());
+        order.setCancelDeadline(null);
+        orderDao.save(order);
+
+        // 发送取消通知
+        try {
+            wxSubscribeService.sendOrderCancelMessage(order);
+        } catch (Exception e) {
+            log.error("发送订单拒绝通知失败: orderNo={}", order.getOrderNo(), e);
+        }
+        log.info("餐厅拒绝订单: orderNo={}, refundAmount={}", order.getOrderNo(), order.getRefundAmount());
+    }
+
+    /**
+     * 餐厅完成制作（制作中→已完成）
+     */
+    public void completeProduction(Long orderId) {
+        Orders order = orderDao.findById(orderId);
+        if (order == null) {
+            throw new RuntimeException("订单不存在");
+        }
+        if (order.getOrderStatus() != 2) {
+            throw new RuntimeException("只有制作中订单才能完成");
+        }
+        order.setOrderStatus(3); // 已完成
+        order.setCompletedTime(LocalDateTime.now());
+        orderDao.save(order);
+
+        // 发送用餐提醒
+        try {
+            wxSubscribeService.sendMealRemindMessage(order);
+        } catch (Exception e) {
+            log.error("发送完成通知失败: orderNo={}", order.getOrderNo(), e);
+        }
+        log.info("订单制作完成: orderNo={}", order.getOrderNo());
     }
 
     public void payOrder(Long userId, Long orderId) {
@@ -314,7 +398,7 @@ public class OrderService {
             throw new RuntimeException("无权操作此订单");
         }
 
-        if (order.getOrderStatus() == 5) {
+        if (order.getOrderStatus() == 4) {
             throw new RuntimeException("订单已取消，无法支付");
         }
 
@@ -346,8 +430,9 @@ public class OrderService {
         userDao.save(user);
 
         order.setPaymentStatus(1);
-        order.setOrderStatus(2);
+        order.setOrderStatus(1); // 待制作
         order.setPaymentTime(LocalDateTime.now());
+        order.setCancelDeadline(LocalDateTime.now().plusMinutes(3)); // 3分钟倒计时
         order.setPointsEarned(pointsEarned);
         order.setPaymentMethod(order.getPayAmount().compareTo(BigDecimal.ZERO) > 0 ? "余额支付" : "兑换券抵扣");
         orderDao.save(order);
@@ -396,11 +481,67 @@ public class OrderService {
                             .diningType(o.getDiningType())
                             .tableNumber(o.getTableNumber())
                             .itemCount(items.size())
+                            .cancelDeadline(o.getCancelDeadline())
                             .createdAt(o.getCreatedAt())
                             .items(itemVOs)
                             .build();
                 })
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * 通用退款处理：退回余额 + 退回兑换券 + 扣除积分 + 恢复库存
+     */
+    private void processRefund(Orders order) {
+        User user = order.getUser();
+
+        // 1. 退回余额
+        if (order.getPayAmount().compareTo(BigDecimal.ZERO) > 0) {
+            user.setBalance(user.getBalance().add(order.getPayAmount()));
+        }
+
+        // 2. 扣除该订单获得的积分
+        if (order.getPointsEarned() != null && order.getPointsEarned() > 0) {
+            int pointsToDeduct = order.getPointsEarned();
+            user.setPointsBalance(Math.max(0, user.getPointsBalance() - pointsToDeduct));
+            // 同步减少累计消费金额对应积分
+            user.setTotalSpentAmount(user.getTotalSpentAmount().subtract(order.getPayAmount()));
+            user.setTotalOrderCount(Math.max(0, user.getTotalOrderCount() - 1));
+
+            PointLog pointLog = new PointLog();
+            pointLog.setUser(user);
+            pointLog.setOrder(order);
+            pointLog.setType(2); // 2=扣除
+            pointLog.setPointsChange(pointsToDeduct);
+            pointLog.setBalanceAfter(user.getPointsBalance());
+            pointLog.setRemark("退款扣除");
+            pointLogDao.save(pointLog);
+
+            log.info("扣除订单积分: orderNo={}, points={}", order.getOrderNo(), pointsToDeduct);
+        }
+
+        userDao.save(user);
+
+        // 3. 退回兑换券
+        List<OrderItem> items = orderItemDao.findByOrder(order);
+        for (OrderItem item : items) {
+            Product product = item.getProduct();
+            if (product != null) {
+                // 恢复库存
+                product.setStock(product.getStock() + item.getQuantity());
+                productDao.save(product);
+
+                // 查找该商品已使用的兑换券并退回
+                UserExchangeVoucher voucher = userExchangeVoucherDao.findUsedByUserIdAndProductId(
+                        user.getId(), product.getId());
+                if (voucher != null) {
+                    voucher.setStatus(0); // 未使用
+                    voucher.setUsedAt(null);
+                    userExchangeVoucherDao.save(voucher);
+                    log.info("退回兑换券: voucherCode={}, orderNo={}", voucher.getVoucherCode(), order.getOrderNo());
+                }
+            }
+        }
     }
 
     private String generateOrderNo() {

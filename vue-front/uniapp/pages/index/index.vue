@@ -107,6 +107,7 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
+import { onLoad } from '@dcloudio/uni-app'
 import { saveTableNo, getTableNo } from '../../utils/tableStorage.js'
 import TabBar from '@/components/TabBar/TabBar.vue'
 

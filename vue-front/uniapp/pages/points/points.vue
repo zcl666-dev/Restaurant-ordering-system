@@ -44,8 +44,8 @@
 
           <view class="record-item" v-for="item in items" :key="item.id">
             <view class="record-info">
-              <text class="record-type">{{ item.type === 1 ? '积分赠送' : '积分兑换' }}</text>
-              <text class="record-desc">{{ item.orderNo || item.remark }}</text>
+              <text class="record-type">{{ item.remark || (item.type === 1 ? '积分赠送' : '积分扣除') }}</text>
+              <text class="record-desc">{{ item.orderNo || '' }}</text>
               <text class="record-time">{{ formatTime(item.createdAt) }}</text>
             </view>
             <text class="record-points" :class="item.type === 1 ? 'points-add' : 'points-sub'">

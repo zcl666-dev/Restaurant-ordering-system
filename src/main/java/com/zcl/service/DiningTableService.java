@@ -133,7 +133,7 @@ public class DiningTableService {
             throw new RuntimeException("桌台不存在");
         }
 
-        // 调用微信API生成小程序码
+        // 调用微信API生成小程序码（getwxacode + scene方式携带桌号）
         String scene = "tableNo=" + java.net.URLEncoder.encode(table.getTableNo(), java.nio.charset.StandardCharsets.UTF_8);
         byte[] imageData = wechatService.generateQrCode(scene, MINI_PROGRAM_PAGE, QRCODE_WIDTH);
 

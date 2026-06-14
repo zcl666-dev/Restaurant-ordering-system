@@ -1,20 +1,22 @@
 <template>
   <view class="tabbar">
-    <view
-      v-for="tab in tabs"
-      :key="tab.pagePath"
-      class="tabbar-item"
-      @tap="switchTab(tab.pagePath)"
-    >
-      <image
-        class="tabbar-icon"
-        :src="currentPath === tab.pagePath ? tab.selectedIconPath : tab.iconPath"
-        mode="aspectFit"
-      />
-      <text
-        class="tabbar-text"
-        :style="{ color: currentPath === tab.pagePath ? selectedColor : color }"
-      >{{ tab.text }}</text>
+    <view class="tabbar-content">
+      <view
+        v-for="tab in tabs"
+        :key="tab.pagePath"
+        class="tabbar-item"
+        @tap="switchTab(tab.pagePath)"
+      >
+        <image
+          class="tabbar-icon"
+          :src="currentPath === tab.pagePath ? tab.selectedIconPath : tab.iconPath"
+          mode="aspectFit"
+        />
+        <text
+          class="tabbar-text"
+          :style="{ color: currentPath === tab.pagePath ? selectedColor : color }"
+        >{{ tab.text }}</text>
+      </view>
     </view>
   </view>
 </template>
@@ -73,19 +75,22 @@ function switchTab(pagePath) {
 
 <style scoped>
 .tabbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-around;
-  height: 110rpx;
-  box-sizing: border-box;
-  background-color: #ffffff;
-  border-top: 1rpx solid #f0f0f0;
-  padding-bottom: env(safe-area-inset-bottom);
   position: fixed;
   left: 0;
   right: 0;
   bottom: 0;
   z-index: 999;
+  background-color: #ffffff;
+  border-top: 1rpx solid #f0f0f0;
+  /* 安全区域在图标区域下方额外撑开，不压缩图标 */
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.tabbar-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  height: 110rpx;
 }
 
 .tabbar-item {

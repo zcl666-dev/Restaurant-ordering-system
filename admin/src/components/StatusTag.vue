@@ -12,12 +12,10 @@ const props = defineProps({
 
 const orderStatusMap = {
   0: { text: '待支付', type: 'warning' },
-  1: { text: '已支付', type: 'primary' },
+  1: { text: '待制作', type: 'primary' },
   2: { text: '制作中', type: '' },
-  3: { text: '待取餐', type: 'success' },
-  4: { text: '已完成', type: 'success' },
-  5: { text: '已取消', type: 'info' },
-  6: { text: '已退款', type: 'danger' }
+  3: { text: '已完成', type: 'success' },
+  4: { text: '已取消', type: 'info' }
 }
 
 const productStatusMap = {

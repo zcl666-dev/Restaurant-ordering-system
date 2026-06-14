@@ -18,12 +18,10 @@
       />
       <el-select v-model="filterStatus" placeholder="订单状态" clearable style="width: 130px;" @change="loadData">
         <el-option :value="0" label="待支付" />
-        <el-option :value="1" label="已支付" />
+        <el-option :value="1" label="待制作" />
         <el-option :value="2" label="制作中" />
-        <el-option :value="3" label="待取餐" />
-        <el-option :value="4" label="已完成" />
-        <el-option :value="5" label="已取消" />
-        <el-option :value="6" label="已退款" />
+        <el-option :value="3" label="已完成" />
+        <el-option :value="4" label="已取消" />
       </el-select>
       <el-date-picker v-model="dateRange" type="daterange" range-separator="至" start-placeholder="开始日期"
         end-placeholder="结束日期" value-format="YYYY-MM-DD" style="width: 260px;" @change="loadData" />
@@ -41,7 +39,11 @@
           <StatusTag :status="row.orderStatus" type="order" />
         </template>
       </el-table-column>
-      <el-table-column prop="diningType" label="就餐方式" width="90" />
+      <el-table-column label="就餐方式" width="90">
+        <template #default="{ row }">
+          {{ row.diningType === '1' ? '堂食' : row.diningType === '2' ? '打包' : '-' }}
+        </template>
+      </el-table-column>
       <el-table-column label="桌号" width="90">
         <template #default="{ row }">
           <el-tag v-if="row.tableNumber" type="success" size="small">{{ row.tableNumber }}</el-tag>
@@ -52,19 +54,25 @@
       <el-table-column label="下单时间" width="170">
         <template #default="{ row }">{{ formatTime(row.createdAt) }}</template>
       </el-table-column>
-      <el-table-column label="操作" width="200" fixed="right">
+      <el-table-column label="操作" width="280" fixed="right">
         <template #default="{ row }">
           <el-button size="small" @click="$router.push(`/orders/${row.id}`)">详情</el-button>
-          <el-dropdown @command="(cmd) => handleStatusChange(row.id, cmd)" v-if="row.orderStatus < 4">
+          <!-- 待制作状态：开始制作 / 拒绝订单 -->
+          <template v-if="row.orderStatus === 1">
+            <el-button size="small" type="success" @click="handleStartProduction(row.id)">开始制作</el-button>
+            <el-button size="small" type="danger" @click="handleReject(row.id)">拒绝</el-button>
+          </template>
+          <!-- 制作中状态：完成订单 -->
+          <el-button v-if="row.orderStatus === 2" size="small" type="primary" @click="handleCompleteProduction(row.id)">完成</el-button>
+          <!-- 其他状态：更改状态下拉 -->
+          <el-dropdown @command="(cmd) => handleStatusChange(row.id, cmd)" v-if="row.orderStatus === 0">
             <el-button size="small" type="warning">
               更改状态 <el-icon class="el-icon--right"><ArrowDown /></el-icon>
             </el-button>
             <template #dropdown>
               <el-dropdown-menu>
-                <el-dropdown-item :command="2" v-if="row.orderStatus <= 1">制作中</el-dropdown-item>
-                <el-dropdown-item :command="3" v-if="row.orderStatus <= 2">待取餐</el-dropdown-item>
-                <el-dropdown-item :command="4" v-if="row.orderStatus <= 3">已完成</el-dropdown-item>
-                <el-dropdown-item :command="5" divided>取消订单</el-dropdown-item>
+                <el-dropdown-item :command="1">待制作</el-dropdown-item>
+                <el-dropdown-item :command="4" divided>取消订单</el-dropdown-item>
               </el-dropdown-menu>
             </template>
           </el-dropdown>
@@ -81,9 +89,9 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { getOrderList, updateOrderStatus } from '../../api/order'
+import { getOrderList, updateOrderStatus, startProduction, rejectOrder, completeProduction } from '../../api/order'
 import StatusTag from '../../components/StatusTag.vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useOrderNotification } from '../../composables/useOrderNotification'
 
 const { voiceEnabled, setVoiceEnabled } = useOrderNotification()
@@ -129,6 +137,33 @@ async function handleStatusChange(id, status) {
   await updateOrderStatus(id, status)
   ElMessage.success('状态已更新')
   loadData()
+}
+
+async function handleStartProduction(id) {
+  try {
+    await ElMessageBox.confirm('确定开始制作该订单？', '确认', { type: 'info' })
+    await startProduction(id)
+    ElMessage.success('已开始制作')
+    loadData()
+  } catch (e) { /* 取消 */ }
+}
+
+async function handleReject(id) {
+  try {
+    await ElMessageBox.confirm('确定拒绝该订单？将自动退款给用户。', '确认拒绝', { type: 'warning' })
+    await rejectOrder(id)
+    ElMessage.success('已拒绝并退款')
+    loadData()
+  } catch (e) { /* 取消 */ }
+}
+
+async function handleCompleteProduction(id) {
+  try {
+    await ElMessageBox.confirm('确定完成该订单的制作？', '确认', { type: 'success' })
+    await completeProduction(id)
+    ElMessage.success('订单已完成')
+    loadData()
+  } catch (e) { /* 取消 */ }
 }
 </script>
 

@@ -1,5 +1,6 @@
 package com.zcl.action;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -14,6 +15,7 @@ import org.springframework.stereotype.Controller;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import java.time.LocalDate;
 
 @Controller
 @Scope("prototype")
@@ -44,6 +46,35 @@ public class UserInfoAction extends ActionSupport {
             writeJson(Result.success("获取成功", user));
         } catch (Exception e) {
             writeJson(Result.error(500, "获取用户信息失败: " + e.getMessage()));
+        }
+        return NONE;
+    }
+
+    public String update() {
+        try {
+            HttpServletRequest request = ServletActionContext.getRequest();
+            Long userId = (Long) request.getAttribute("userId");
+
+            StringBuilder sb = new StringBuilder();
+            String line;
+            while ((line = request.getReader().readLine()) != null) {
+                sb.append(line);
+            }
+            JsonNode json = objectMapper.readTree(sb.toString());
+
+            String nickName = json.has("nickName") ? json.get("nickName").asText(null) : null;
+            String avatarUrl = json.has("avatarUrl") ? json.get("avatarUrl").asText(null) : null;
+            String phone = json.has("phone") ? json.get("phone").asText(null) : null;
+            Integer gender = json.has("gender") && !json.get("gender").isNull() ? json.get("gender").asInt() : null;
+            LocalDate birthday = null;
+            if (json.has("birthday") && !json.get("birthday").isNull()) {
+                birthday = LocalDate.parse(json.get("birthday").asText());
+            }
+
+            User user = userInfoService.updateProfile(userId, nickName, avatarUrl, phone, gender, birthday);
+            writeJson(Result.success("保存成功", user));
+        } catch (Exception e) {
+            writeJson(Result.error(500, "更新个人信息失败: " + e.getMessage()));
         }
         return NONE;
     }

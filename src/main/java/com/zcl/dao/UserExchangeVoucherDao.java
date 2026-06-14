@@ -43,4 +43,21 @@ public class UserExchangeVoucherDao extends BaseDao<UserExchangeVoucher, Long> {
                 .list();
         return list.isEmpty() ? null : list.get(0);
     }
+
+    /**
+     * 查找用户某个商品已使用的兑换券（最近使用的）
+     */
+    @SuppressWarnings("unchecked")
+    public UserExchangeVoucher findUsedByUserIdAndProductId(Long userId, Long productId) {
+        List<UserExchangeVoucher> list = getCurrentSession()
+                .createQuery("SELECT v FROM UserExchangeVoucher v JOIN v.pointsMall m " +
+                        "WHERE v.user.id = :userId AND m.product.id = :productId " +
+                        "AND v.status = 1 " +
+                        "ORDER BY v.usedAt DESC")
+                .setParameter("userId", userId)
+                .setParameter("productId", productId)
+                .setMaxResults(1)
+                .list();
+        return list.isEmpty() ? null : list.get(0);
+    }
 }

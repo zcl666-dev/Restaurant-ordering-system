@@ -60,6 +60,12 @@
 			"style": {
 				"navigationBarTitleText": "我的兑换券"
 			}
+		},
+		{
+			"path": "pages/profile/profile",
+			"style": {
+				"navigationBarTitleText": "个人信息"
+			}
 		}
 	],
 	"globalStyle": {

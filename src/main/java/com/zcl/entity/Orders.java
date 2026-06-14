@@ -59,7 +59,7 @@ public class Orders {
     private String tableNumber; // 桌号
 
     @Column(name = "order_status", nullable = false)
-    private Integer orderStatus = 0; // 0待支付 1已支付 2制作中 3待取餐 4已完成 5已取消 6已退款
+    private Integer orderStatus = 0; // 0待支付 1待制作 2制作中 3已完成 4已取消
 
     @Column(name = "payment_status", nullable = false)
     private Integer paymentStatus = 0; // 0未支付 1已支付 2已退款
@@ -72,6 +72,21 @@ public class Orders {
 
     @Column(name = "remark", length = 500)
     private String remark; // 订单备注
+
+    @Column(name = "cancel_deadline")
+    private LocalDateTime cancelDeadline; // 可取消截止时间（待制作状态时有效）
+
+    @Column(name = "auto_production_time")
+    private LocalDateTime autoProductionTime; // 自动转为制作中的时间
+
+    @Column(name = "completed_time")
+    private LocalDateTime completedTime; // 订单完成时间
+
+    @Column(name = "refund_amount", precision = 10, scale = 2)
+    private BigDecimal refundAmount = BigDecimal.ZERO; // 实际退款金额
+
+    @Column(name = "refund_time")
+    private LocalDateTime refundTime; // 退款完成时间
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;

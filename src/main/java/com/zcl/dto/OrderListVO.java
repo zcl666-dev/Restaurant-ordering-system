@@ -21,6 +21,7 @@ public class OrderListVO {
     private String diningType;
     private String tableNumber;
     private Integer itemCount;
+    private LocalDateTime cancelDeadline; // 可取消截止时间
     private LocalDateTime createdAt;
     private java.util.List<OrderItemVO> items;
 }

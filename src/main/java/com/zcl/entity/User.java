@@ -12,6 +12,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /**
@@ -35,6 +36,15 @@ public class User {
 
     @Column(name = "avatar_url", length = 500)
     private String avatarUrl;
+
+    @Column(name = "phone", length = 20)
+    private String phone;
+
+    @Column(name = "gender")
+    private Integer gender; // 0未知 1男 2女
+
+    @Column(name = "birthday")
+    private LocalDate birthday;
 
     @Column(name = "points_balance", nullable = false)
     private Integer pointsBalance = 0;

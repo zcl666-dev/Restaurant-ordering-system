@@ -27,6 +27,10 @@
           <el-icon><List /></el-icon>
           <template #title>订单管理</template>
         </el-menu-item>
+        <el-menu-item index="/staff-order">
+          <el-icon><Service /></el-icon>
+          <template #title>代客点餐</template>
+        </el-menu-item>
         <el-menu-item index="/stats">
           <el-icon><TrendCharts /></el-icon>
           <template #title>销售统计</template>
@@ -78,6 +82,9 @@
         <router-view />
       </el-main>
     </el-container>
+
+    <!-- 未处理订单悬浮提示 -->
+    <OrderNotification />
   </el-container>
 </template>
 
@@ -86,6 +93,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getAdminInfo, removeToken } from '../../utils/auth'
 import { useOrderNotification } from '../../composables/useOrderNotification'
+import OrderNotification from '../../components/OrderNotification.vue'
 
 const route = useRoute()
 const router = useRouter()

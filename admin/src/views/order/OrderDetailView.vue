@@ -2,7 +2,14 @@
   <div v-loading="loading">
     <div class="page-header">
       <h2>订单详情</h2>
-      <el-button @click="$router.back()">返回</el-button>
+      <div class="header-actions">
+        <template v-if="order">
+          <el-button v-if="order.orderStatus === 1" type="success" @click="handleStartProduction">开始制作</el-button>
+          <el-button v-if="order.orderStatus === 1" type="danger" @click="handleReject">拒绝订单</el-button>
+          <el-button v-if="order.orderStatus === 2" type="primary" @click="handleCompleteProduction">完成订单</el-button>
+        </template>
+        <el-button @click="$router.back()">返回</el-button>
+      </div>
     </div>
 
     <template v-if="order">
@@ -19,7 +26,7 @@
                 <StatusTag :status="order.orderStatus" type="order" />
               </el-descriptions-item>
               <el-descriptions-item label="下单时间">{{ formatTime(order.createdAt) }}</el-descriptions-item>
-              <el-descriptions-item label="就餐方式">{{ order.diningType || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="就餐方式">{{ order.diningType === '1' ? '堂食' : order.diningType === '2' ? '打包' : '-' }}</el-descriptions-item>
               <el-descriptions-item label="桌号">{{ order.tableNumber || '-' }}</el-descriptions-item>
               <el-descriptions-item label="备注">{{ order.remark || '-' }}</el-descriptions-item>
             </el-descriptions>
@@ -92,11 +99,13 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
-import { getOrderDetail } from '../../api/order'
+import { useRoute, useRouter } from 'vue-router'
+import { getOrderDetail, startProduction, rejectOrder, completeProduction } from '../../api/order'
 import StatusTag from '../../components/StatusTag.vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 
 const route = useRoute()
+const router = useRouter()
 const loading = ref(false)
 const order = ref(null)
 
@@ -112,9 +121,48 @@ onMounted(async () => {
 function formatTime(t) {
   return t ? t.replace('T', ' ').substring(0, 19) : ''
 }
+
+async function handleStartProduction() {
+  try {
+    await ElMessageBox.confirm('确定开始制作该订单？', '确认', { type: 'info' })
+    await startProduction(order.value.id)
+    ElMessage.success('已开始制作')
+    order.value.orderStatus = 2
+  } catch (e) { /* 取消 */ }
+}
+
+async function handleReject() {
+  try {
+    await ElMessageBox.confirm('确定拒绝该订单？将自动退款给用户。', '确认拒绝', { type: 'warning' })
+    await rejectOrder(order.value.id)
+    ElMessage.success('已拒绝并退款')
+    order.value.orderStatus = 4
+  } catch (e) { /* 取消 */ }
+}
+
+async function handleCompleteProduction() {
+  try {
+    await ElMessageBox.confirm('确定完成该订单的制作？', '确认', { type: 'success' })
+    await completeProduction(order.value.id)
+    ElMessage.success('订单已完成')
+    order.value.orderStatus = 3
+  } catch (e) { /* 取消 */ }
+}
 </script>
 
 <style scoped>
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.header-actions {
+  display: flex;
+  gap: 8px;
+}
+
 .detail-card {
   background: #fff;
   border-radius: 10px;

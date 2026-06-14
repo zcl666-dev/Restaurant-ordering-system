@@ -43,4 +43,14 @@ public class ProductVO {
      * 月销量
      */
     private Integer salesCount;
+
+    /**
+     * 库存
+     */
+    private Integer stock;
+
+    /**
+     * 是否有规格 0无 1有
+     */
+    private Integer hasOptions;
 }

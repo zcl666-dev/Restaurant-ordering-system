@@ -27,7 +27,7 @@ public class WechatService {
     private static final String WX_ACCESS_TOKEN_URL =
             "https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid=%s&secret=%s";
     private static final String WX_GET_WXACODE_UNLIMITED_URL =
-            "https://api.weixin.qq.com/wxa/getwxacodeunlimited?access_token=%s";
+            "https://api.weixin.qq.com/wxa/getwxacodeunlimit?access_token=%s";
 
     @Autowired
     private WxConfigService wxConfigService;
@@ -72,9 +72,9 @@ public class WechatService {
     }
 
     /**
-     * 生成微信小程序码（失败直接抛异常，返回具体原因）
-     * @param scene  场景值，如 "tableNo=A01"
-     * @param page   小程序页面路径，如 "pages/login/login"
+     * 生成微信小程序码（wxacode.getUnlimited，scene 方式携带参数）
+     * @param scene  场景值，如 "tableNo=A01"（最长32字符）
+     * @param page   小程序页面路径，如 "pages/index/index"
      * @param width  宽度
      * @return 图片字节数组（PNG格式）
      */
@@ -82,88 +82,56 @@ public class WechatService {
         String accessToken = getAccessToken();
         String url = String.format(WX_GET_WXACODE_UNLIMITED_URL, accessToken);
 
-        System.out.println("[DEBUG] getwxacodeunlimited URL: " + url);
-        System.out.println("[DEBUG] scene=" + scene + ", page=" + page + ", width=" + width);
-
         Map<String, Object> params = new HashMap<>();
         params.put("scene", scene);
         params.put("page", page);
+        params.put("env_version", "trial");
         params.put("check_path", false);
         params.put("width", width);
 
-        String jsonBody;
-        try {
-            jsonBody = objectMapper.writeValueAsString(params);
-        } catch (Exception e) {
-            throw new RuntimeException("JSON序列化失败: " + e.getMessage());
-        }
-        System.out.println("[DEBUG] JSON body: " + jsonBody);
+        // 打印完整请求信息
+        System.out.println("====== 微信生成小程序码请求 ======");
+        System.out.println("URL: " + url);
+        System.out.println("RequestBody: " + params);
+        System.out.println("=================================");
 
-        byte[] imageData;
         try {
-            java.net.HttpURLConnection conn = (java.net.HttpURLConnection) new java.net.URL(url).openConnection();
-            conn.setRequestMethod("POST");
-            conn.setRequestProperty("Content-Type", "application/json");
-            conn.setDoOutput(true);
-            try (java.io.OutputStream os = conn.getOutputStream()) {
-                os.write(jsonBody.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            HttpEntity<String> request = new HttpEntity<>(objectMapper.writeValueAsString(params), headers);
+
+            byte[] imageData = restTemplate.postForObject(url, request, byte[].class);
+
+            if (imageData == null || imageData.length == 0) {
+                throw new RuntimeException("微信返回数据为空");
             }
 
-            int responseCode = conn.getResponseCode();
-            System.out.println("[DEBUG] HTTP response code: " + responseCode);
-
-            if (responseCode == 200) {
-                try (java.io.InputStream is = conn.getInputStream()) {
-                    imageData = is.readAllBytes();
-                }
-                System.out.println("[DEBUG] response length: " + (imageData == null ? "null" : imageData.length));
-                if (imageData != null && imageData.length > 0) {
-                    System.out.println("[DEBUG] first byte: " + imageData[0] + " (0x" + String.format("%02X", imageData[0]) + ")");
-                }
-            } else {
-                try (java.io.InputStream es = conn.getErrorStream()) {
-                    String errBody = new String(es.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
-                    System.out.println("[DEBUG] error body: " + errBody);
-                    throw new RuntimeException("HTTP " + responseCode + ": " + errBody);
-                }
-            }
-        } catch (RuntimeException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new RuntimeException("调用微信接口失败: " + e.getMessage());
-        }
-
-        if (imageData == null || imageData.length == 0) {
-            throw new RuntimeException("微信返回数据为空");
-        }
-
-        // 微信API错误时返回JSON（以'{'开头）
-        if (imageData[0] == '{') {
-            String errJson = new String(imageData, java.nio.charset.StandardCharsets.UTF_8);
-            System.out.println("[DEBUG] 微信返回JSON: " + errJson);
-            try {
+            // 微信API错误时返回JSON（以'{'开头）
+            if (imageData[0] == '{') {
+                String errJson = new String(imageData, java.nio.charset.StandardCharsets.UTF_8);
+                System.out.println("微信返回JSON: " + errJson);
                 JsonNode errNode = objectMapper.readTree(errJson);
                 int errCode = errNode.has("errcode") ? errNode.get("errcode").asInt() : -1;
                 String errMsg = errNode.has("errmsg") ? errNode.get("errmsg").asText() : errJson;
 
                 // access_token过期，清除缓存后重试一次
                 if (errCode == 40001 || errCode == 42001) {
-                    log.warn("access_token过期，清除缓存重试");
+                    System.out.println("access_token过期，清除缓存重试");
                     cachedAccessToken = null;
                     accessTokenExpireTime = 0;
                     return generateQrCode(scene, page, width);
                 }
 
                 throw new RuntimeException("微信生成小程序码失败: errcode=" + errCode + ", errmsg=" + errMsg);
-            } catch (RuntimeException e) {
-                throw e;
-            } catch (Exception e) {
-                throw new RuntimeException("微信返回异常: " + errJson);
             }
-        }
 
-        log.info("微信小程序码生成成功");
-        return imageData;
+            System.out.println("微信小程序码生成成功, 大小: " + imageData.length + " bytes");
+            return imageData;
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RuntimeException("调用微信接口失败: " + e.getMessage());
+        }
     }
 
     /**

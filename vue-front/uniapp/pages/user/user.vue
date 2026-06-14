@@ -123,7 +123,7 @@ const goOrder = () => {
 }
 
 const goProfile = () => {
-  uni.showToast({ title: '个人信息开发中', icon: 'none' })
+  uni.navigateTo({ url: '/pages/profile/profile' })
 }
 
 const goVoucher = () => {

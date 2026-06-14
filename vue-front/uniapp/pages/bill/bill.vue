@@ -58,15 +58,12 @@
         <!-- 操作按钮 -->
         <view class="card-actions">
           <view class="action-btn-group">
-            <view class="action-btn-wrapper" v-if="order.orderStatus === 4">
-              <view class="scratch-badge">
-                <text class="scratch-badge-text">参与刮奖</text>
-              </view>
+            <view class="action-btn-wrapper" v-if="order.orderStatus === 3">
               <view class="action-btn" @tap.stop="goDetail(order.id)">
                 <text class="action-btn-text">去评价</text>
               </view>
             </view>
-            <view class="action-btn" @tap.stop="reorder(order)" v-if="order.orderStatus === 4 || order.orderStatus === 5">
+            <view class="action-btn" @tap.stop="reorder(order)" v-if="order.orderStatus === 3 || order.orderStatus === 4">
               <text class="action-btn-text">再来一单</text>
             </view>
           </view>
@@ -92,12 +89,10 @@ const isLoading = ref(true)
 const statusText = (status) => {
   const map = {
     0: '待支付',
-    1: '已支付',
+    1: '待制作',
     2: '制作中',
-    3: '待取餐',
-    4: '已完成',
-    5: '已取消',
-    6: '已退款'
+    3: '已完成',
+    4: '已取消'
   }
   return map[status] || '未知'
 }

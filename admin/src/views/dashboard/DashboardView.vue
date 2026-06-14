@@ -115,8 +115,8 @@ function renderSalesChart(data) {
 
 function renderStatusChart(data) {
   const chart = echarts.init(statusChartRef.value)
-  const statusNames = { 0: '待支付', 1: '已支付', 2: '制作中', 3: '待取餐', 4: '已完成', 5: '已取消', 6: '已退款' }
-  const colors = ['#FF6B6B', '#4facfe', '#f093fb', '#43e97b', '#67c23a', '#909399', '#e6a23c']
+  const statusNames = { 0: '待支付', 1: '待制作', 2: '制作中', 3: '已完成', 4: '已取消' }
+  const colors = ['#FF6B6B', '#4facfe', '#f093fb', '#67c23a', '#909399']
   const pieData = Object.entries(data).map(([k, v], i) => ({ name: statusNames[k] || `状态${k}`, value: v, itemStyle: { color: colors[i % colors.length] } }))
   chart.setOption({
     tooltip: { trigger: 'item' },

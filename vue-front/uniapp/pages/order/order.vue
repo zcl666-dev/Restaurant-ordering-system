@@ -479,7 +479,7 @@ onShow(() => {
 /* 购物车底部栏 */
 .cart-bar {
   position: fixed;
-  bottom: 110rpx;
+  bottom: calc(110rpx + env(safe-area-inset-bottom));
   left: 0;
   right: 0;
   height: 110rpx;

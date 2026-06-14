@@ -21,6 +21,16 @@
         </view>
       </view>
 
+      <!-- 待制作倒计时 -->
+      <view class="countdown-bar" v-if="orderData.orderStatus === 1 && countdownSeconds > 0">
+        <text class="countdown-icon">⏳</text>
+        <text class="countdown-text">可取消剩余时间：{{ formatCountdown(countdownSeconds) }}</text>
+      </view>
+      <view class="countdown-bar expired" v-else-if="orderData.orderStatus === 1 && countdownSeconds <= 0">
+        <text class="countdown-icon">⏰</text>
+        <text class="countdown-text">取消时间已过，订单将自动开始制作</text>
+      </view>
+
       <view class="order-items">
         <view class="section-title-row">
           <view class="section-title-bar"></view>
@@ -101,15 +111,32 @@
         </view>
       </view>
 
+      <!-- 待支付：取消 + 去支付 -->
       <view class="order-actions" v-if="orderData.orderStatus === 0">
-        <button class="action-btn cancel-btn" @tap="handleCancel">取消订单</button>
+        <button class="action-btn cancel-btn" @tap="handleCancelPending">取消订单</button>
         <button class="action-btn pay-btn" @tap="handlePay">去支付</button>
       </view>
 
-      <view class="order-actions" v-else-if="orderData.orderStatus === 3">
-        <button class="action-btn complete-btn" @tap="handleComplete">确认完成</button>
+      <!-- 待制作：取消订单（倒计时内） -->
+      <view class="order-actions" v-else-if="orderData.orderStatus === 1">
+        <button
+          class="action-btn cancel-btn"
+          @tap="handleCancel"
+          :disabled="countdownSeconds <= 0"
+        >取消订单</button>
       </view>
 
+      <!-- 制作中：联系商家 -->
+      <view class="order-actions" v-else-if="orderData.orderStatus === 2">
+        <button class="action-btn done-btn" disabled>制作中，请耐心等待</button>
+      </view>
+
+      <!-- 已完成：再来一单 -->
+      <view class="order-actions" v-else-if="orderData.orderStatus === 3">
+        <button class="action-btn reorder-btn" @tap="handleReorder">再来一单</button>
+      </view>
+
+      <!-- 已取消 / 已完成 -->
       <view class="order-actions" v-else>
         <button class="action-btn done-btn" disabled>{{ statusText }}</button>
       </view>
@@ -123,24 +150,24 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
-import { getOrderDetail, cancelOrder, payOrder, completeOrder, updateOrderDiningType } from '@/api/order.js'
+import { getOrderDetail, cancelOrder, payOrder, updateOrderDiningType } from '@/api/order.js'
 
 const orderData = ref(null)
 const isLoading = ref(true)
+const countdownSeconds = ref(0)
 let orderId = null
+let countdownTimer = null
 
 const statusText = computed(() => {
   if (!orderData.value) return ''
   const map = {
     0: '待支付',
-    1: '已支付',
+    1: '待制作',
     2: '制作中',
-    3: '待取餐',
-    4: '已完成',
-    5: '已取消',
-    6: '已退款'
+    3: '已完成',
+    4: '已取消'
   }
   return map[orderData.value.orderStatus] || '未知'
 })
@@ -149,12 +176,10 @@ const statusIcon = computed(() => {
   if (!orderData.value) return ''
   const map = {
     0: '💳',
-    1: '✅',
+    1: '⏳',
     2: '👨‍🍳',
-    3: '🔔',
-    4: '🎉',
-    5: '❌',
-    6: '↩️'
+    3: '🎉',
+    4: '❌'
   }
   return map[orderData.value.orderStatus] || '📋'
 })
@@ -163,10 +188,50 @@ const statusClass = computed(() => {
   if (!orderData.value) return ''
   const status = orderData.value.orderStatus
   if (status === 0) return 'status-pending'
-  if (status === 1 || status === 2 || status === 3) return 'status-processing'
-  if (status === 4) return 'status-done'
+  if (status === 1) return 'status-waiting'
+  if (status === 2) return 'status-processing'
+  if (status === 3) return 'status-done'
   return 'status-cancelled'
 })
+
+function formatCountdown(seconds) {
+  const m = Math.floor(seconds / 60)
+  const s = seconds % 60
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+}
+
+function startCountdown() {
+  stopCountdown()
+  if (!orderData.value || orderData.value.orderStatus !== 1 || !orderData.value.cancelDeadline) {
+    countdownSeconds.value = 0
+    return
+  }
+
+  const deadline = new Date(orderData.value.cancelDeadline).getTime()
+  const now = Date.now()
+  let remaining = Math.floor((deadline - now) / 1000)
+  if (remaining < 0) remaining = 0
+  countdownSeconds.value = remaining
+
+  if (remaining > 0) {
+    countdownTimer = setInterval(() => {
+      remaining--
+      countdownSeconds.value = remaining
+      if (remaining <= 0) {
+        stopCountdown()
+        // 倒计时结束，刷新订单状态
+        setTimeout(() => fetchOrderDetail(), 1000)
+      }
+    }, 1000)
+  }
+}
+
+function stopCountdown() {
+  if (countdownTimer) {
+    clearInterval(countdownTimer)
+    countdownTimer = null
+  }
+}
 
 const fetchOrderDetail = async () => {
   if (!orderId) return
@@ -174,6 +239,7 @@ const fetchOrderDetail = async () => {
   try {
     const data = await getOrderDetail(orderId)
     orderData.value = data
+    startCountdown()
   } catch (err) {
     console.error('获取订单详情失败:', err)
     uni.showToast({ title: err.message || '加载失败', icon: 'none' })
@@ -182,7 +248,8 @@ const fetchOrderDetail = async () => {
   }
 }
 
-const handleCancel = async () => {
+// 取消待支付订单
+const handleCancelPending = async () => {
   uni.showModal({
     title: '提示',
     content: '确定要取消订单吗？',
@@ -192,7 +259,33 @@ const handleCancel = async () => {
           await cancelOrder(orderId)
           uni.showToast({ title: '订单已取消', icon: 'success' })
           setTimeout(() => {
-            uni.switchTab({ url: '/pages/bill/bill' })
+            uni.navigateBack()
+          }, 1000)
+        } catch (err) {
+          uni.showToast({ title: err.message || '取消失败', icon: 'none' })
+        }
+      }
+    }
+  })
+}
+
+// 取消待制作订单（倒计时内，自动退款）
+const handleCancel = async () => {
+  if (countdownSeconds.value <= 0) {
+    uni.showToast({ title: '取消时间已过', icon: 'none' })
+    return
+  }
+  uni.showModal({
+    title: '取消订单',
+    content: '确定取消订单吗？支付金额将原路退回。',
+    success: async (res) => {
+      if (res.confirm) {
+        try {
+          await cancelOrder(orderId)
+          uni.showToast({ title: '订单已取消，退款已到账', icon: 'success' })
+          stopCountdown()
+          setTimeout(() => {
+            uni.navigateBack()
           }, 1000)
         } catch (err) {
           uni.showToast({ title: err.message || '取消失败', icon: 'none' })
@@ -211,9 +304,7 @@ const handlePay = async () => {
         try {
           await payOrder(orderId)
           uni.showToast({ title: '支付成功', icon: 'success' })
-          setTimeout(() => {
-            uni.switchTab({ url: '/pages/bill/bill' })
-          }, 1000)
+          fetchOrderDetail()
         } catch (err) {
           uni.showToast({ title: err.message || '支付失败', icon: 'none' })
         }
@@ -224,7 +315,6 @@ const handlePay = async () => {
 
 const handleDiningTypeChange = async (type) => {
   if (orderData.value.diningType === String(type)) return
-
   try {
     await updateOrderDiningType(orderId, type)
     orderData.value.diningType = String(type)
@@ -234,27 +324,17 @@ const handleDiningTypeChange = async (type) => {
   }
 }
 
-const handleComplete = async () => {
-  uni.showModal({
-    title: '确认完成',
-    content: '确认已用餐完毕？',
-    success: async (res) => {
-      if (res.confirm) {
-        try {
-          await completeOrder(orderId)
-          uni.showToast({ title: '订单已完成', icon: 'success' })
-          fetchOrderDetail()
-        } catch (err) {
-          uni.showToast({ title: err.message || '操作失败', icon: 'none' })
-        }
-      }
-    }
-  })
+const handleReorder = () => {
+  uni.switchTab({ url: '/pages/index/index' })
 }
 
 onLoad((options) => {
   orderId = options.id
   fetchOrderDetail()
+})
+
+onUnmounted(() => {
+  stopCountdown()
 })
 </script>
 
@@ -352,6 +432,37 @@ onLoad((options) => {
 .order-time {
   font-size: 22rpx;
   color: rgba(255, 255, 255, 0.65);
+}
+
+/* 倒计时栏 */
+.countdown-bar {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin: 20rpx 24rpx 0;
+  padding: 20rpx 28rpx;
+  background: #fff8e6;
+  border-radius: 16rpx;
+  border: 2rpx solid #ffe0a3;
+}
+
+.countdown-bar.expired {
+  background: #fff0f0;
+  border-color: #ffc8c8;
+}
+
+.countdown-icon {
+  font-size: 32rpx;
+}
+
+.countdown-text {
+  font-size: 26rpx;
+  color: #e6a23c;
+  font-weight: 500;
+}
+
+.countdown-bar.expired .countdown-text {
+  color: #f56c6c;
 }
 
 /* 商品明细 */
@@ -566,6 +677,10 @@ onLoad((options) => {
   transform: scale(0.95);
 }
 
+.action-btn[disabled] {
+  opacity: 0.6;
+}
+
 .cancel-btn {
   background-color: #fff;
   color: #666;
@@ -584,10 +699,10 @@ onLoad((options) => {
   min-width: 400rpx;
 }
 
-.complete-btn {
-  background: linear-gradient(135deg, #128812 0%, #1aad19 100%);
+.reorder-btn {
+  background: linear-gradient(135deg, #FF6B6B 0%, #FF8E53 100%);
   color: #fff;
   min-width: 400rpx;
-  box-shadow: 0 8rpx 24rpx rgba(18, 136, 18, 0.3);
+  box-shadow: 0 8rpx 24rpx rgba(255, 107, 107, 0.3);
 }
 </style>

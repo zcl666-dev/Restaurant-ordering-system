@@ -46,6 +46,10 @@
             <interceptor-ref name="userStack"/>
         </action>
 
+        <action name="api_user_update" class="com.zcl.action.UserInfoAction" method="update">
+            <interceptor-ref name="userStack"/>
+        </action>
+
         <action name="api_product_display" class="com.zcl.action.ProductAction" method="display">
             <interceptor-ref name="userStack"/>
         </action>
@@ -207,6 +211,35 @@
         </action>
 
         <action name="api_admin_orders_check_new" class="com.zcl.action.AdminOrderAction" method="checkNew">
+            <interceptor-ref name="adminStack"/>
+        </action>
+
+        <action name="api_admin_orders_unprocessed_count" class="com.zcl.action.AdminOrderAction" method="unprocessedCount">
+            <interceptor-ref name="adminStack"/>
+        </action>
+
+        <action name="api_admin_order_start_production" class="com.zcl.action.AdminOrderAction" method="startProduction">
+            <interceptor-ref name="adminStack"/>
+        </action>
+
+        <action name="api_admin_order_reject" class="com.zcl.action.AdminOrderAction" method="rejectOrder">
+            <interceptor-ref name="adminStack"/>
+        </action>
+
+        <action name="api_admin_order_complete_production" class="com.zcl.action.AdminOrderAction" method="completeProduction">
+            <interceptor-ref name="adminStack"/>
+        </action>
+
+        <!-- ========== 代客点餐接口 ========== -->
+        <action name="api_admin_staff_products" class="com.zcl.action.AdminOrderAction" method="staffProducts">
+            <interceptor-ref name="adminStack"/>
+        </action>
+
+        <action name="api_admin_staff_product_detail" class="com.zcl.action.AdminOrderAction" method="staffProductDetail">
+            <interceptor-ref name="adminStack"/>
+        </action>
+
+        <action name="api_admin_staff_create_order" class="com.zcl.action.AdminOrderAction" method="staffCreateOrder">
             <interceptor-ref name="adminStack"/>
         </action>
 
