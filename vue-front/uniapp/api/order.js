@@ -27,3 +27,15 @@ export const completeOrder = (id) => {
 export const updateOrderDiningType = (id, diningType) => {
   return put(`/api_order_update_dining_type.action?id=${id}`, { diningType })
 }
+
+export const updateOrderRemark = (id, remark) => {
+  return put(`/api_order_update_remark.action?id=${id}`, { remark })
+}
+
+export const createReview = (data) => {
+  return post('/api_review_create.action', data)
+}
+
+export const checkReview = (orderId) => {
+  return get(`/api_review_check.action?id=${orderId}`)
+}

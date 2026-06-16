@@ -335,11 +335,13 @@ public class AdminOrderService {
 
     private AdminOrderVO toOrderVO(Orders order) {
         List<OrderItem> items = orderItemDao.findByOrder(order);
+        String displayName = "代客下单".equals(order.getPaymentMethod())
+                ? "前台代客" : order.getUser().getNickName();
         return AdminOrderVO.builder()
                 .id(order.getId())
                 .orderNo(order.getOrderNo())
                 .userId(order.getUser().getId())
-                .userNickName(order.getUser().getNickName())
+                .userNickName(displayName)
                 .payAmount(order.getPayAmount())
                 .orderStatus(order.getOrderStatus())
                 .paymentStatus(order.getPaymentStatus())
@@ -353,6 +355,8 @@ public class AdminOrderService {
 
     private AdminOrderDetailVO toDetailVO(Orders order) {
         List<OrderItem> items = orderItemDao.findByOrder(order);
+        String displayName = "代客下单".equals(order.getPaymentMethod())
+                ? "前台代客" : order.getUser().getNickName();
         List<OrderItemVO> itemVOs = items.stream().map(item -> {
             List<OptionVO> options = new ArrayList<>();
             if (item.getOptionSnapshot() != null) {
@@ -374,7 +378,7 @@ public class AdminOrderService {
                 .id(order.getId())
                 .orderNo(order.getOrderNo())
                 .userId(order.getUser().getId())
-                .userNickName(order.getUser().getNickName())
+                .userNickName(displayName)
                 .userAvatarUrl(order.getUser().getAvatarUrl())
                 .totalAmount(order.getTotalAmount())
                 .discountAmount(order.getDiscountAmount())

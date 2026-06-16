@@ -58,6 +58,10 @@
             <interceptor-ref name="userStack"/>
         </action>
 
+        <action name="api_product_recommend" class="com.zcl.action.ProductAction" method="recommend">
+            <interceptor-ref name="userStack"/>
+        </action>
+
         <action name="api_cart_add" class="com.zcl.action.CartAction" method="add">
             <interceptor-ref name="userStack"/>
         </action>
@@ -91,6 +95,10 @@
         </action>
 
         <action name="api_order_update_dining_type" class="com.zcl.action.OrderAction" method="updateDiningType">
+            <interceptor-ref name="userStack"/>
+        </action>
+
+        <action name="api_order_update_remark" class="com.zcl.action.OrderAction" method="updateRemark">
             <interceptor-ref name="userStack"/>
         </action>
 
@@ -278,6 +286,19 @@
 
         <!-- ========== 规格组管理接口 ========== -->
         <action name="api_admin_option_groups" class="com.zcl.action.OptionGroupAction" method="list">
+            <interceptor-ref name="adminStack"/>
+        </action>
+
+        <!-- ========== 评价接口 ========== -->
+        <action name="api_review_create" class="com.zcl.action.OrderReviewAction" method="create">
+            <interceptor-ref name="userStack"/>
+        </action>
+
+        <action name="api_review_check" class="com.zcl.action.OrderReviewAction" method="check">
+            <interceptor-ref name="userStack"/>
+        </action>
+
+        <action name="api_admin_review_list" class="com.zcl.action.OrderReviewAction" method="list">
             <interceptor-ref name="adminStack"/>
         </action>
 

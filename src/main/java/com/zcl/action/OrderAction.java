@@ -129,6 +129,20 @@ public class OrderAction extends ActionSupport {
         return NONE;
     }
 
+    public String updateRemark() {
+        try {
+            HttpServletRequest request = ServletActionContext.getRequest();
+            Long userId = (Long) request.getAttribute("userId");
+            JsonNode jsonNode = objectMapper.readTree(request.getInputStream());
+            String remark = jsonNode.has("remark") ? jsonNode.get("remark").asText() : null;
+            orderService.updateRemark(userId, id, remark);
+            writeJson(Result.success("更新成功", null));
+        } catch (Exception e) {
+            writeJson(Result.error(500, "更新备注失败: " + e.getMessage()));
+        }
+        return NONE;
+    }
+
     public String complete() {
         try {
             HttpServletRequest request = ServletActionContext.getRequest();

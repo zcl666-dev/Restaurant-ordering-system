@@ -59,9 +59,10 @@ No `@SpringBootApplication` main class. Application boots via `web.xml` → `Con
 | Layer | Package | Pattern |
 |-------|---------|---------|
 | **Actions** | `com.zcl.action` | Struts2 `ActionSupport` subclasses. Manually parse JSON from `HttpServletRequest` via Jackson `ObjectMapper`, call service, write `Result<T>` JSON response. Each method returns `NONE`. |
-| **Services** | `com.zcl.service` | `@Service` + `@Transactional`. Business logic. |
+| **Services** | `com.zcl.service` | `@Service` + `@Transactional`. Business logic. Includes `OrderScheduler` for scheduled tasks. |
 | **DAOs** | `com.zcl.dao` | Extend `BaseDao<T, ID>` which wraps `SessionFactory.getCurrentSession()`. Provides `findById`, `findAll`, `save`, `delete`, `findByHql`, `findOneByHql`, `count`. |
-| **Entities** | `com.zcl.entity` | JPA annotations (`@Entity`, `@Table`) + Lombok `@Data`. 16 tables. |
+| **Entities** | `com.zcl.entity` | JPA annotations (`@Entity`, `@Table`) + Lombok `@Data`. 18 tables. |
+| **Servlets** | `com.zcl.servlet` | `FileUploadServlet` for file upload handling. |
 | **DTOs** | `com.zcl.dto` | Request/response objects. `Result<T>` is the unified response wrapper (`code`, `message`, `data`). |
 | **Interceptors** | `com.zcl.interceptor` | `LoginInterceptor` (user JWT), `AdminInterceptor` (admin JWT). |
 | **Config** | `com.zcl.config` | `CorsFilter` (allows all origins). |
@@ -84,7 +85,7 @@ Struts2 filter is mapped to `*.action` in web.xml. Action names are defined in `
 
 ### WeChat Mini Program (`vue-front/uniapp/`)
 
-8 pages with 4-tab bottom nav (Home, Order, Bills, User): `index`, `order`, `bill`, `user`, `login`, `product-detail`, `order-detail`, `points`. Entry point is `login` page which checks for existing token.
+12 pages with 4-tab bottom nav (Home, Order, Bills, User): `index`, `order`, `bill`, `user`, `login`, `product-detail`, `order-detail`, `points`, `points-exchange`, `voucher`, `profile`, `review`. Entry point is `login` page which checks for existing token.
 
 - API layer in `api/request.js` — wraps `uni.request`, auto-attaches Bearer token, redirects to login on 401
 - Auth flow: `uni.login()` → send code to backend → receive JWT → store in `uni.setStorageSync('token')`
@@ -93,7 +94,7 @@ Struts2 filter is mapped to `*.action` in web.xml. Action names are defined in `
 
 ### Admin Dashboard (`admin/`)
 
-Vue 3 SPA with Element Plus. Routes: login, dashboard (ECharts stats), users, categories, products (list+form), orders (list+detail), dining tables.
+Vue 3 SPA with Element Plus. Routes: login, dashboard (ECharts stats), users, categories, products (list+form), orders (list+detail), dining tables, reviews/feedback.
 
 - API layer uses Axios (`api/request.js`), Bearer token injection, 401 redirect
 - Token stored/managed via `utils/auth.js`
@@ -105,14 +106,18 @@ Vue 3 SPA with Element Plus. Routes: login, dashboard (ECharts stats), users, ca
 |------|---------|
 | `src/main/resources/applicationContext.xml` | Spring beans: component scan, HikariCP datasource, Hibernate SessionFactory, transaction manager, JwtUtil bean |
 | `src/main/resources/struts.xml` | All Struts2 action mappings and interceptor stacks |
-| `src/main/resources/db.properties` | DB credentials, Hibernate dialect, JWT secret, WeChat appid/secret |
+| `src/main/resources/db.properties` | DB credentials, Hibernate dialect, JWT secret, WeChat appid/secret, OSS keys (see `db.properties.example` for template) |
 | `src/main/webapp/WEB-INF/web.xml` | Servlet config: Spring listener, encoding filter, CORS filter, Struts2 filter (`*.action`) |
 | `admin/vite.config.js` | Admin dev server + API proxy config |
 | `vue-front/uniapp/utils/config.js` | Mini program backend base URL |
 
 ## Database
 
-16 entity tables managed by Hibernate. Key relationships: Product→Category, Product↔OptionGroup (via ProductOptionRelation), Cart→CartItems, Orders→OrderItems. Connection pool is HikariCP (max 10). Full DDL in `SQL.md`.
+18 entity tables managed by Hibernate. Key relationships: Product→Category, Product↔OptionGroup (via ProductOptionRelation), Cart→CartItems, Orders→OrderItems. Connection pool is HikariCP (max 10). Full DDL in `SQL.md`.
+
+## Testing
+
+No automated tests exist. `src/test/java/com/zcl/` is empty — `mvn test` succeeds but runs zero tests. JUnit 5 is declared as a dependency for future use.
 
 ## Additional References
 

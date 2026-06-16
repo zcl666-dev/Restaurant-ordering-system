@@ -90,6 +90,12 @@ const routes = [
         name: 'PointsMall',
         component: () => import('../views/points/PointsMallView.vue'),
         meta: { title: '积分商城' }
+      },
+      {
+        path: 'feedback',
+        name: 'Feedback',
+        component: () => import('../views/feedback/FeedbackView.vue'),
+        meta: { title: '用户反馈' }
       }
     ]
   }

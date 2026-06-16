@@ -78,7 +78,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { onShow } from '@dcloudio/uni-app'
+import { onShow, onPullDownRefresh } from '@dcloudio/uni-app'
 import { getOrderList, getOrderDetail } from '@/api/order.js'
 import { addToCart } from '@/api/cart.js'
 import TabBar from '@/components/TabBar/TabBar.vue'
@@ -159,6 +159,11 @@ onMounted(() => {
 
 onShow(() => {
   fetchOrderList()
+})
+
+onPullDownRefresh(async () => {
+  await fetchOrderList()
+  uni.stopPullDownRefresh()
 })
 </script>
 

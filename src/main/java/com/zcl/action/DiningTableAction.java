@@ -168,6 +168,7 @@ public class DiningTableAction extends ActionSupport {
 
             HttpServletResponse response = ServletActionContext.getResponse();
             response.setContentType("image/png");
+            response.setCharacterEncoding("UTF-8");
             response.setHeader("Content-Disposition", "attachment; filename=" + dto.getTableNo() + ".png");
             response.setContentLength(imageData.length);
 
@@ -175,10 +176,16 @@ public class DiningTableAction extends ActionSupport {
                 out.write(imageData);
                 out.flush();
             }
+            // 阻止 Struts2 后续处理
+            return null;
         } catch (Exception e) {
-            writeJson(Result.error(500, "下载二维码失败: " + e.getMessage()));
+            try {
+                writeJson(Result.error(500, "下载二维码失败: " + e.getMessage()));
+            } catch (Exception ex) {
+                e.printStackTrace();
+            }
+            return null;
         }
-        return NONE;
     }
 
     // Getters and Setters

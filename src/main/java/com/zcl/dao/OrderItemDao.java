@@ -18,6 +18,14 @@ public class OrderItemDao extends BaseDao<OrderItem, Long> {
     }
 
     @SuppressWarnings("unchecked")
+    public List<OrderItem> findByOrderId(Long orderId) {
+        return getCurrentSession()
+                .createQuery("FROM OrderItem WHERE order.id = :orderId")
+                .setParameter("orderId", orderId)
+                .list();
+    }
+
+    @SuppressWarnings("unchecked")
     public List<Object[]> findTopProducts(int limit) {
         return getCurrentSession()
                 .createQuery("SELECT oi.product.id, oi.productNameSnapshot, " +

@@ -97,6 +97,7 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
+import { onPullDownRefresh } from '@dcloudio/uni-app'
 import { getUserInfo, updateUserProfile } from '@/api/user.js'
 
 const form = reactive({
@@ -215,6 +216,11 @@ const handleSave = async () => {
 
 onMounted(() => {
   fetchUserInfo()
+})
+
+onPullDownRefresh(async () => {
+  await fetchUserInfo()
+  uni.stopPullDownRefresh()
 })
 </script>
 

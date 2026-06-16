@@ -1,7 +1,7 @@
 <template>
   <view class="user-page">
     <view class="header-bg">
-      <image class="bg-image" src="/static/PersonalCenter/PersonalCenter.jpg" mode="aspectFill" />
+      <image class="bg-image" src="https://zcl-library-management-system.oss-cn-beijing.aliyuncs.com/%E5%AE%A3%E4%BC%A0%E5%9B%BE/5.jpg" mode="aspectFill" />
       <view class="header-overlay"></view>
       <view class="user-info-row">
         <view class="avatar-wrapper">
@@ -79,7 +79,7 @@
 
 <script setup>
 import { ref, reactive } from 'vue'
-import { onShow } from '@dcloudio/uni-app'
+import { onShow, onPullDownRefresh } from '@dcloudio/uni-app'
 import { getUserInfo } from '@/api/user.js'
 import { getVoucherList } from '@/api/points.js'
 import TabBar from '@/components/TabBar/TabBar.vue'
@@ -141,6 +141,11 @@ const goVoucherExchange = () => {
 onShow(() => {
   fetchUserInfo()
   fetchVoucherCount()
+})
+
+onPullDownRefresh(async () => {
+  await Promise.all([fetchUserInfo(), fetchVoucherCount()])
+  uni.stopPullDownRefresh()
 })
 </script>
 

@@ -268,6 +268,30 @@ public class OrderService {
         log.info("更新就餐方式: orderId={}, diningType={}", orderId, diningType);
     }
 
+    public void updateRemark(Long userId, Long orderId, String remark) {
+        if (userId == null) {
+            throw new RuntimeException("用户未登录");
+        }
+
+        Orders order = orderDao.findById(orderId);
+        if (order == null) {
+            throw new RuntimeException("订单不存在");
+        }
+
+        if (!order.getUser().getId().equals(userId)) {
+            throw new RuntimeException("无权操作此订单");
+        }
+
+        if (order.getOrderStatus() != 0) {
+            throw new RuntimeException("只有待支付订单才能修改备注");
+        }
+
+        order.setRemark(remark);
+        orderDao.save(order);
+
+        log.info("更新订单备注: orderId={}, remark={}", orderId, remark);
+    }
+
     /**
      * 用户确认完成订单
      */

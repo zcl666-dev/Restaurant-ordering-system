@@ -74,6 +74,18 @@ public class ProductDisplayService {
     }
 
     /**
+     * 获取推荐商品列表（is_recommend = 1 且 status = 1）
+     */
+    public List<ProductVO> getRecommendProducts() {
+        List<Product> allProducts = productDao.findAll();
+        return allProducts.stream()
+                .filter(p -> p.getStatus() != null && p.getStatus() == 1)
+                .filter(p -> p.getIsRecommend() != null && p.getIsRecommend() == 1)
+                .map(this::convertToProductVO)
+                .collect(Collectors.toList());
+    }
+
+    /**
      * 将 Product 实体转换为 ProductVO
      */
     private ProductVO convertToProductVO(Product product) {

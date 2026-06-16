@@ -105,7 +105,22 @@
           <text class="summary-label">桌号</text>
           <text class="summary-value">{{ orderData.tableNumber }}</text>
         </view>
-        <view class="summary-row" v-if="orderData.remark">
+        <!-- 订单备注：待支付状态可编辑 -->
+        <view class="summary-row remark-edit-row" v-if="orderData.orderStatus === 0">
+          <text class="summary-label">备注</text>
+          <view class="remark-edit-wrapper">
+            <textarea
+              class="remark-textarea"
+              v-model="remarkText"
+              placeholder="请填写您的特殊要求，如：少辣、不要香菜、先上汤等"
+              maxlength="200"
+              :auto-height="true"
+            />
+            <text class="remark-count">{{ remarkText.length }}/200</text>
+          </view>
+        </view>
+        <!-- 非待支付状态只读显示 -->
+        <view class="summary-row" v-else-if="orderData.remark">
           <text class="summary-label">备注</text>
           <text class="summary-value remark">{{ orderData.remark }}</text>
         </view>
@@ -131,9 +146,21 @@
         <button class="action-btn done-btn" disabled>制作中，请耐心等待</button>
       </view>
 
-      <!-- 已完成：再来一单 -->
+      <!-- 已完成：去评价 + 再来一单 -->
       <view class="order-actions" v-else-if="orderData.orderStatus === 3">
+        <button class="action-btn review-btn" @tap="goReview" v-if="!reviewData">去评价</button>
         <button class="action-btn reorder-btn" @tap="handleReorder">再来一单</button>
+      </view>
+
+      <!-- 已评价摘要 -->
+      <view class="review-summary" v-if="reviewData && orderData.orderStatus === 3">
+        <view class="review-header">
+          <text class="review-title">我的评价</text>
+          <view class="review-stars">
+            <text v-for="i in 5" :key="i" class="review-star" :class="{ active: i <= reviewData.rating }">★</text>
+          </view>
+        </view>
+        <text class="review-content" v-if="reviewData.content">{{ reviewData.content }}</text>
       </view>
 
       <!-- 已取消 / 已完成 -->
@@ -151,10 +178,13 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { onLoad } from '@dcloudio/uni-app'
-import { getOrderDetail, cancelOrder, payOrder, updateOrderDiningType } from '@/api/order.js'
+import { onLoad, onShow, onPullDownRefresh } from '@dcloudio/uni-app'
+import { getOrderDetail, cancelOrder, payOrder, updateOrderDiningType, updateOrderRemark, checkReview } from '@/api/order.js'
+import { addToCart } from '@/api/cart.js'
 
 const orderData = ref(null)
+const reviewData = ref(null)
+const remarkText = ref('')
 const isLoading = ref(true)
 const countdownSeconds = ref(0)
 let orderId = null
@@ -239,7 +269,17 @@ const fetchOrderDetail = async () => {
   try {
     const data = await getOrderDetail(orderId)
     orderData.value = data
+    remarkText.value = data.remark || ''
     startCountdown()
+    // 已完成状态检查是否已评价
+    if (data.orderStatus === 3) {
+      try {
+        const reviewRes = await checkReview(orderId)
+        if (reviewRes && reviewRes.id) {
+          reviewData.value = reviewRes
+        }
+      } catch (e) {}
+    }
   } catch (err) {
     console.error('获取订单详情失败:', err)
     uni.showToast({ title: err.message || '加载失败', icon: 'none' })
@@ -302,6 +342,10 @@ const handlePay = async () => {
     success: async (res) => {
       if (res.confirm) {
         try {
+          // 先保存备注
+          if (remarkText.value.trim() !== (orderData.value.remark || '')) {
+            await updateOrderRemark(orderId, remarkText.value.trim() || null)
+          }
           await payOrder(orderId)
           uni.showToast({ title: '支付成功', icon: 'success' })
           fetchOrderDetail()
@@ -324,13 +368,55 @@ const handleDiningTypeChange = async (type) => {
   }
 }
 
-const handleReorder = () => {
-  uni.switchTab({ url: '/pages/index/index' })
+const handleReorder = async () => {
+  try {
+    const items = orderData.value?.items || []
+    if (items.length === 0) {
+      uni.showToast({ title: '订单无商品', icon: 'none' })
+      return
+    }
+    for (const item of items) {
+      await addToCart({
+        productId: item.productId,
+        quantity: item.quantity,
+        optionSnapshot: item.optionSnapshot || null
+      })
+    }
+    uni.showToast({ title: '已加入购物车', icon: 'success' })
+    setTimeout(() => {
+      uni.switchTab({ url: '/pages/order/order' })
+    }, 500)
+  } catch (err) {
+    uni.showToast({ title: err.message || '操作失败', icon: 'none' })
+  }
+}
+
+const goReview = () => {
+  const orderNo = orderData.value?.orderNo || ''
+  uni.navigateTo({
+    url: `/pages/review/review?orderId=${orderId}&orderNo=${orderNo}`
+  })
 }
 
 onLoad((options) => {
   orderId = options.id
   fetchOrderDetail()
+})
+
+// 从评价页返回时刷新评价状态
+onShow(() => {
+  if (orderId && orderData.value?.orderStatus === 3) {
+    checkReview(orderId).then(res => {
+      if (res && res.id) {
+        reviewData.value = res
+      }
+    }).catch(() => {})
+  }
+})
+
+onPullDownRefresh(async () => {
+  await fetchOrderDetail()
+  uni.stopPullDownRefresh()
 })
 
 onUnmounted(() => {
@@ -651,6 +737,36 @@ onUnmounted(() => {
   text-align: right;
 }
 
+.remark-edit-row {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.remark-edit-wrapper {
+  width: 100%;
+  margin-top: 16rpx;
+}
+
+.remark-textarea {
+  width: 100%;
+  min-height: 120rpx;
+  background-color: #f8f8f8;
+  border-radius: 12rpx;
+  padding: 20rpx;
+  font-size: 26rpx;
+  color: #333;
+  box-sizing: border-box;
+  line-height: 1.5;
+}
+
+.remark-count {
+  display: block;
+  text-align: right;
+  font-size: 24rpx;
+  color: #ccc;
+  margin-top: 8rpx;
+}
+
 /* 操作按钮 */
 .order-actions {
   display: flex;
@@ -704,5 +820,53 @@ onUnmounted(() => {
   color: #fff;
   min-width: 400rpx;
   box-shadow: 0 8rpx 24rpx rgba(255, 107, 107, 0.3);
+}
+
+.review-btn {
+  background: linear-gradient(135deg, #ffd700 0%, #ff9500 100%);
+  color: #fff;
+  min-width: 280rpx;
+  box-shadow: 0 8rpx 24rpx rgba(255, 149, 0, 0.3);
+}
+
+.review-summary {
+  margin: 24rpx 0;
+  background: #fff9f0;
+  border-radius: 16rpx;
+  padding: 28rpx 32rpx;
+  border: 2rpx solid #ffe0b2;
+}
+
+.review-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16rpx;
+}
+
+.review-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #333;
+}
+
+.review-stars {
+  display: flex;
+  gap: 8rpx;
+}
+
+.review-star {
+  font-size: 32rpx;
+  color: #ddd;
+}
+
+.review-star.active {
+  color: #ff9500;
+}
+
+.review-content {
+  font-size: 26rpx;
+  color: #666;
+  line-height: 1.6;
 }
 </style>

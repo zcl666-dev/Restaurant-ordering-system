@@ -79,7 +79,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { onShow } from '@dcloudio/uni-app'
+import { onShow, onPullDownRefresh } from '@dcloudio/uni-app'
 import { getVoucherList } from '@/api/points.js'
 
 const loading = ref(true)
@@ -133,6 +133,11 @@ const fetchData = async () => {
 
 onShow(() => {
   fetchData()
+})
+
+onPullDownRefresh(async () => {
+  await fetchData()
+  uni.stopPullDownRefresh()
 })
 </script>
 

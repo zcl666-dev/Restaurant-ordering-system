@@ -65,6 +65,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { onPullDownRefresh } from '@dcloudio/uni-app'
 import { getPointsMallList, exchangePoints } from '@/api/points.js'
 
 const pointsBalance = ref(0)
@@ -131,6 +132,11 @@ const handleExchange = (item) => {
 
 onMounted(() => {
   fetchData()
+})
+
+onPullDownRefresh(async () => {
+  await fetchData()
+  uni.stopPullDownRefresh()
 })
 </script>
 

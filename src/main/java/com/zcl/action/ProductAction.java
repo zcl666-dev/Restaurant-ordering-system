@@ -6,6 +6,7 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.opensymphony.xwork2.ActionSupport;
 import com.zcl.dto.CategoryWithProductsVO;
 import com.zcl.dto.ProductDetailVO;
+import com.zcl.dto.ProductVO;
 import com.zcl.dto.Result;
 import com.zcl.service.ProductDisplayService;
 import com.zcl.service.ProductDetailService;
@@ -59,6 +60,16 @@ public class ProductAction extends ActionSupport {
             writeJson(Result.success("获取成功", product));
         } catch (Exception e) {
             writeJson(Result.error(404, e.getMessage()));
+        }
+        return NONE;
+    }
+
+    public String recommend() {
+        try {
+            List<ProductVO> products = productDisplayService.getRecommendProducts();
+            writeJson(Result.success("获取成功", products));
+        } catch (Exception e) {
+            writeJson(Result.error(500, "获取推荐商品失败: " + e.getMessage()));
         }
         return NONE;
     }

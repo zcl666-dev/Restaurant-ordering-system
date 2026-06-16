@@ -47,6 +47,10 @@
           <el-menu-item index="/point-logs">积分流水</el-menu-item>
           <el-menu-item index="/points-mall">积分商城</el-menu-item>
         </el-sub-menu>
+        <el-menu-item index="/feedback">
+          <el-icon><ChatDotRound /></el-icon>
+          <template #title>用户反馈</template>
+        </el-menu-item>
       </el-menu>
     </el-aside>
 

@@ -18,6 +18,10 @@ request.interceptors.request.use(config => {
 
 request.interceptors.response.use(
   response => {
+    // blob 类型响应（如下载文件）直接返回，不走 JSON 解析
+    if (response.config.responseType === 'blob') {
+      return response.data
+    }
     const { code, message, data } = response.data
     if (code === 200) {
       return data

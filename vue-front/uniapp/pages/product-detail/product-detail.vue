@@ -80,7 +80,7 @@
 
 <script setup>
 import { ref, reactive } from 'vue'
-import { onLoad } from '@dcloudio/uni-app'
+import { onLoad, onPullDownRefresh } from '@dcloudio/uni-app'
 import { getProductDetail } from '@/api/product.js'
 import { addToCart } from '@/api/cart.js'
 
@@ -173,6 +173,11 @@ onLoad((options) => {
     productId.value = options.id
   }
   fetchProductDetail()
+})
+
+onPullDownRefresh(async () => {
+  await fetchProductDetail()
+  uni.stopPullDownRefresh()
 })
 </script>
 

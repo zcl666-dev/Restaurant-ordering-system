@@ -93,7 +93,7 @@
                 size="small"
                 circle
                 @click="decreaseQuantity(index)"
-                :disabled="item.quantity <= 1"
+                :disabled="false"
               >
                 <el-icon><Minus /></el-icon>
               </el-button>
@@ -105,6 +105,15 @@
                 @click="increaseQuantity(index)"
               >
                 <el-icon><Plus /></el-icon>
+              </el-button>
+              <el-button
+                size="small"
+                circle
+                type="danger"
+                @click="removeFromCart(index)"
+                class="btn-delete"
+              >
+                <el-icon><Delete /></el-icon>
               </el-button>
             </div>
           </div>
@@ -121,19 +130,29 @@
         <!-- 桌号 -->
         <div class="cart-field">
           <label>桌号</label>
-          <el-input
+          <el-select
             v-model="tableNumber"
-            placeholder="请输入桌号"
+            placeholder="请选择桌号"
             size="small"
-          />
+            clearable
+            filterable
+            style="width: 100%"
+          >
+            <el-option
+              v-for="t in tableList"
+              :key="t.id"
+              :label="t.tableNo + ' - ' + t.tableName"
+              :value="t.tableNo"
+            />
+          </el-select>
         </div>
 
         <!-- 就餐方式 -->
         <div class="cart-field">
           <label>就餐方式</label>
           <el-radio-group v-model="diningType" size="small">
-            <el-radio-button value="堂食">堂食</el-radio-button>
-            <el-radio-button value="外带">外带</el-radio-button>
+            <el-radio-button value="1">堂食</el-radio-button>
+            <el-radio-button value="2">打包</el-radio-button>
           </el-radio-group>
         </div>
 
@@ -232,17 +251,19 @@
 <script setup>
 import { ref, computed, onMounted, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Minus, Plus } from '@element-plus/icons-vue'
+import { Minus, Plus, Delete } from '@element-plus/icons-vue'
 import { getStaffProducts, getStaffProductDetail, staffCreateOrder } from '../../api/order'
+import { getTableList } from '../../api/table'
 
 // === 数据 ===
 const categories = ref([])
 const activeCategoryId = ref(null)
 const cart = ref([])
 const tableNumber = ref('')
-const diningType = ref('堂食')
+const diningType = ref('1')
 const remark = ref('')
 const submitting = ref(false)
+const tableList = ref([])
 
 // 规格弹窗
 const showOptionDialog = ref(false)
@@ -396,13 +417,20 @@ function addToCart(product, quantity, optionSnapshot, optionText) {
   }
 }
 
-// 减少数量
+// 减少数量（数量为1时移除）
 function decreaseQuantity(index) {
   const item = cart.value[index]
   if (item.quantity > 1) {
     item.quantity--
     item.subtotal = item.unitPrice * item.quantity
+  } else {
+    cart.value.splice(index, 1)
   }
+}
+
+// 从购物车删除
+function removeFromCart(index) {
+  cart.value.splice(index, 1)
 }
 
 // 增加数量
@@ -483,8 +511,19 @@ async function loadProducts() {
   }
 }
 
+// 加载桌台列表
+async function loadTables() {
+  try {
+    const result = await getTableList({ page: 0, size: 200 })
+    tableList.value = (result.content || []).filter(t => t.status === 1)
+  } catch (e) {
+    console.error('获取桌台列表失败:', e)
+  }
+}
+
 onMounted(() => {
   loadProducts()
+  loadTables()
 })
 </script>
 

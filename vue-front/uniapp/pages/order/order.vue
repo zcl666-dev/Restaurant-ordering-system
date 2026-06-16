@@ -8,7 +8,9 @@
           placeholder="搜索商品"
           v-model="searchText"
           @confirm="handleSearch"
+          @input="handleSearchInput"
         />
+        <text class="search-clear" v-if="searchText" @tap="clearSearch">✕</text>
         <view class="search-line"></view>
       </view>
     </view>
@@ -25,7 +27,7 @@
     </view>
 
     <CategoryProduct
-      v-else-if="categoryData.length > 0"
+      v-else-if="categoryData.length > 0 && !isSearching"
       ref="categoryProductRef"
       :categories="categoryData"
       :default-index="defaultIndex"
@@ -34,6 +36,46 @@
       @scroll="handleScroll"
       @add-to-cart="handleQuickAdd"
     />
+
+    <!-- 搜索结果 -->
+    <scroll-view
+      v-else-if="isSearching"
+      class="search-result-scroll"
+      scroll-y
+    >
+      <view class="search-result-content">
+        <view class="search-result-header">
+          <text class="search-result-title">搜索"{{ searchText }}"</text>
+          <text class="search-result-count">共{{ searchResultCount }}个商品</text>
+        </view>
+        <view class="search-empty" v-if="searchResultCount === 0">
+          <text class="search-empty-icon">🔍</text>
+          <text class="search-empty-text">未找到相关商品</text>
+        </view>
+        <view
+          v-for="product in searchResults"
+          :key="product.id"
+          class="product-card"
+          @click="handleProductClick(product)"
+        >
+          <image class="product-image" :src="product.image" mode="aspectFill" />
+          <view class="product-info">
+            <text class="product-name">{{ product.name }}</text>
+            <text class="product-desc" v-if="product.desc">{{ product.desc }}</text>
+            <text class="product-sales" v-if="product.salesCount > 0">月售{{ product.salesCount }}</text>
+            <view class="product-bottom">
+              <view class="price-row">
+                <text class="price-symbol">¥</text>
+                <text class="product-price">{{ product.price.toFixed(0) }}</text>
+              </view>
+              <view class="add-btn" @click.stop="handleQuickAdd(product)">
+                <text class="add-icon">+</text>
+              </view>
+            </view>
+          </view>
+        </view>
+      </view>
+    </scroll-view>
 
     <view class="empty-container" v-else>
       <text class="empty-icon">🍽</text>
@@ -112,7 +154,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { onShow } from '@dcloudio/uni-app'
+import { onShow, onPullDownRefresh } from '@dcloudio/uni-app'
 import CategoryProduct from '@/components/CategoryProduct/CategoryProduct.vue'
 import TabBar from '@/components/TabBar/TabBar.vue'
 import { getProductDisplay } from '@/api/product.js'
@@ -122,6 +164,28 @@ import { createOrder } from '@/api/order.js'
 import { getTableNo } from '@/utils/tableStorage.js'
 
 const searchText = ref('')
+const isSearching = computed(() => searchText.value.trim().length > 0)
+
+const searchResults = computed(() => {
+  const keyword = searchText.value.trim().toLowerCase()
+  if (!keyword) return []
+
+  const results = []
+  for (const cat of categoryData.value) {
+    for (const product of cat.products) {
+      if (
+        product.name.toLowerCase().includes(keyword) ||
+        (product.desc && product.desc.toLowerCase().includes(keyword))
+      ) {
+        results.push(product)
+      }
+    }
+  }
+  return results
+})
+
+const searchResultCount = computed(() => searchResults.value.length)
+
 const defaultIndex = ref(0)
 const categoryProductRef = ref(null)
 const categoryData = ref([])
@@ -244,12 +308,15 @@ const onCartItemImageError = (event, item) => {
 }
 
 const handleSearch = () => {
-  if (searchText.value.trim()) {
-    uni.showToast({
-      title: `搜索: ${searchText.value}`,
-      icon: 'none'
-    })
-  }
+  // 输入确认时触发搜索（已有实时过滤，无需额外操作）
+}
+
+const handleSearchInput = () => {
+  // 实时过滤由 computed 属性自动完成
+}
+
+const clearSearch = () => {
+  searchText.value = ''
 }
 
 const handleCategoryChange = (data) => {
@@ -342,6 +409,11 @@ onMounted(() => {
 onShow(() => {
   fetchCart()
 })
+
+onPullDownRefresh(async () => {
+  await Promise.all([fetchProductDisplay(), fetchCart()])
+  uni.stopPullDownRefresh()
+})
 </script>
 
 <style lang="scss" scoped>
@@ -393,6 +465,18 @@ onShow(() => {
   font-size: 28rpx;
   background-color: transparent;
   padding-left: 16rpx;
+}
+
+.search-clear {
+  width: 40rpx;
+  height: 40rpx;
+  line-height: 40rpx;
+  text-align: center;
+  font-size: 24rpx;
+  color: #999;
+  background: #e0e0e0;
+  border-radius: 50%;
+  flex-shrink: 0;
 }
 
 .loading-container,
@@ -774,5 +858,151 @@ onShow(() => {
 
 .cart-empty-icon {
   font-size: 64rpx;
+}
+
+/* ========== 搜索结果 ========== */
+.search-result-scroll {
+  flex: 1;
+  background-color: #fff;
+}
+
+.search-result-content {
+  padding: 0 20rpx 120rpx;
+}
+
+.search-result-header {
+  padding: 24rpx 8rpx 16rpx;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.search-result-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #333;
+}
+
+.search-result-count {
+  font-size: 24rpx;
+  color: #999;
+}
+
+.search-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 120rpx 0;
+  gap: 16rpx;
+}
+
+.search-empty-icon {
+  font-size: 80rpx;
+}
+
+.search-empty-text {
+  font-size: 28rpx;
+  color: #999;
+}
+
+/* 搜索结果商品卡片 */
+.search-result-content .product-card {
+  display: flex;
+  background: #fff;
+  border-radius: 16rpx;
+  padding: 20rpx;
+  margin-bottom: 16rpx;
+  box-shadow: 0 2rpx 16rpx rgba(0, 0, 0, 0.04);
+  border: 1rpx solid #f5f5f5;
+}
+
+.search-result-content .product-image {
+  width: 180rpx;
+  height: 180rpx;
+  border-radius: 14rpx;
+  background-color: #f5f5f5;
+  flex-shrink: 0;
+}
+
+.search-result-content .product-info {
+  flex: 1;
+  margin-left: 20rpx;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.search-result-content .product-name {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #333;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-result-content .product-desc {
+  font-size: 22rpx;
+  color: #999;
+  margin-top: 6rpx;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.4;
+}
+
+.search-result-content .product-sales {
+  font-size: 22rpx;
+  color: #999;
+  margin-top: 4rpx;
+}
+
+.search-result-content .product-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10rpx;
+}
+
+.search-result-content .price-row {
+  display: flex;
+  align-items: baseline;
+  gap: 2rpx;
+}
+
+.search-result-content .price-symbol {
+  font-size: 22rpx;
+  font-weight: 600;
+  color: #FF6B6B;
+}
+
+.search-result-content .product-price {
+  font-size: 36rpx;
+  font-weight: 700;
+  color: #FF6B6B;
+  line-height: 1;
+}
+
+.search-result-content .add-btn {
+  width: 52rpx;
+  height: 52rpx;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #FF6B6B, #FF8E53);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 4rpx 12rpx rgba(255, 107, 107, 0.3);
+}
+
+.search-result-content .add-icon {
+  font-size: 36rpx;
+  color: #fff;
+  font-weight: 300;
+  line-height: 1;
 }
 </style>
